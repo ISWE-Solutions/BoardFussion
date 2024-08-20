@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="hr_employee_public_view_form_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.public.form.inherit</field>
+            <field name="model">hr.employee.public</field>
+            <field name="inherit_id" ref="hr.hr_employee_public_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='parent_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='coach_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_send_appraisal_request']" position="attributes">
+                    <attribute name="string">Request Evaluation</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_hr_employee_inherit_tree" model="ir.ui.view">
+            <field name="name">hr.employee.tree.inherit</field>
+            <field name="model">hr.employee.public</field>
+            <field name="inherit_id" ref="hr.hr_employee_public_view_tree"/>
+            <field name="arch" type="xml">
+                <!-- Remove the coach field column -->
+                <xpath expr="//field[@name='coach_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='coach_id']" position="replace"/>
+                <!-- Change parent_id to Responsible -->
+                <field name="parent_id" position="attributes">
+                    <attribute name="string">Responsible</attribute>
+                </field>
+                <!-- Change job_title to title -->
+                <field name="job_title" position="attributes">
+                    <attribute name="string">title</attribute>
+                </field>
+                <!-- Change the view title -->
+                <xpath expr="//field[@name='name']" position="attributes">
+                    <attribute name="string">Members</attribute>
+                </xpath>
+            </field>
+        </record>
+<!--        <record id="hr.employee_action_public" model="ir.actions.act_window">-->
+<!--            <field name="name">Members</field>-->
+<!--        </record>-->
+
+<!--        &lt;!&ndash; Optional: Update the menu item label &ndash;&gt;-->
+
+        <record id="hr_employee_menu_public" model="ir.ui.menu">
+            <field name="name">Members</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="hr_employee_inherit_form_view" model="ir.ui.view">
+        <field name="name">hr.employee.inherit.form.view</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+<!--            <xpath expr="//form/sheet//field[@name='work_email']" position="after">-->
+<!--                <fields name="committees_ids" widget="many2many_tags" string="Committees"/>-->
+<!--            </xpath>-->
+        </field>
+    </record>
+
+</odoo>

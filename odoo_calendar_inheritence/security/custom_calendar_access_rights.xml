@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="calendar.access_calendar_event_all_employee" model="ir.model.access">
+            <field name="group_id" ref="odoo_calendar_inheritence.group_agenda_meeting_board_member"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="calendar.access_calendar_event_partner_manager" model="ir.model.access">
+            <field name="group_id" ref="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!--        #Knowledge Article -->
+        <record id="knowledge.access_knowledge_article_user" model="ir.model.access">
+            <field name="group_id" ref="odoo_calendar_inheritence.group_agenda_meeting_board_member"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="product.access_product_document_user" model="ir.model.access">
+            <field name="group_id" ref="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+    </data>
+</odoo>

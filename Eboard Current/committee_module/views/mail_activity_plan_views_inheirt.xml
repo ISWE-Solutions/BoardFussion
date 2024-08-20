@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <record id="mail_activity_plan_template_view_tree_inherit" model="ir.ui.view">
+            <field name="name">mail.activity.plan.template.view.tree.inherit</field>
+            <field name="model">mail.activity.plan</field>
+            <field name="inherit_id" ref="mail.mail_activity_plan_view_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='department_id']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+            </field>
+        </record>
+        <record id="mail_activity_plan_template_view_form_inherit" model="ir.ui.view">
+            <field name="name">mail.activity.plan.template.view.form.inherit</field>
+            <field name="model">mail.activity.plan</field>
+            <field name="inherit_id" ref="mail.mail_activity_plan_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='department_id']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="hr_employee_public_view_form_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.public.form.inherit</field>
+            <field name="model">hr.employee.public</field>
+            <field name="inherit_id" ref="hr.hr_employee_public_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='parent_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='coach_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_send_appraisal_request']" position="attributes">
+                    <attribute name="string">Request Evaluation</attribute>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

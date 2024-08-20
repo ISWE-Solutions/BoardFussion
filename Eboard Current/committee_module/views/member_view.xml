@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="hr.menu_hr_root" model="ir.ui.menu">
+            <field name="name">Members</field>
+        </record>
+
+        <record id="hr.menu_config_employee" model="ir.ui.menu">
+            <field name="name">Member</field>
+        </record>
+
+        <record id="hr.menu_hr_employee_payroll" model="ir.ui.menu">
+            <field name="name">Members</field>
+        </record>
+
+        <record id="hr.menu_hr_employee_user" model="ir.ui.menu">
+            <field name="name">Members</field>
+        </record>
+
+        <record id="hr.open_view_employee_list_my" model="ir.actions.act_window">
+            <field name="name">Members</field>
+        </record>
+
+        <!--        <record id="hr_contract_salary_payroll.hr_payroll_menu_contract_type" model="ir.ui.menu">-->
+        <!--            <field name="name">Member Types</field>-->
+        <!--        </record>-->
+
+        <record id="hr_employee_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_employee_tree_inherited</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_tree"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="name" position="attributes">
+                    <attribute name="string">Member Name</attribute>
+                </field>
+            </field>
+        </record>
+
+<!--        <record id="act_member_from_committees" model="ir.actions.act_window">-->
+<!--            <field name="name">Members</field>-->
+<!--            <field name="res_model">hr.employee</field>-->
+<!--            <field name="view_mode">tree,kanban,form</field>-->
+<!--            <field name="search_view_id" ref="view_employee_filter"/>-->
+<!--            <field name="context">{-->
+<!--                "searchpanel_default_committees_ids": active_id,-->
+<!--                "default_committees_ids": active_id,-->
+<!--                "search_default_group_department": 1,-->
+<!--                "search_default_committees_ids": active_id,-->
+<!--                "expand": 1}-->
+<!--            </field>-->
+<!--            <field name="help" type="html">-->
+<!--                <p class="o_view_nocontent_smiling_face">-->
+<!--                    Add a new member-->
+<!--                </p>-->
+<!--                <p>-->
+<!--                    With just a quick glance on the Odoo member screen, you-->
+<!--                    can easily find all the information you need for each person;-->
+<!--                    contact data, job position, availability, etc.-->
+<!--                </p>-->
+<!--            </field>-->
+<!--        </record>-->
+<!--        #Removes Group Create From Kanban Showing +Department-->
+         <record id="hr_kanban_inherited" model="ir.ui.view">
+            <field name="name">hr_kanban_inherited</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.hr_kanban_view_employees"/>
+            <field name="arch" type="xml">
+                <xpath expr="//kanban" position="attributes">
+                    <attribute name="group_create">false</attribute>
+
+                </xpath>
+            </field>
+         </record>
+
+
+        <record id="hr_department_kanban_inherited" model="ir.ui.view">
+            <field name="name">hr_department_kanban_inherited</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr.hr_department_view_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="after">
+                    <button class="btn btn-primary" name='%(hr.act_employee_from_department)d' type="action">
+                        <t t-out="record.total_employee.raw_value"/>
+                        Members
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr_employee_skills_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_employee_skills_tree_inherited</field>
+            <field name="model">hr.employee.skill.report</field>
+            <field name="inherit_id" ref="hr_skills.hr_employee_skill_report_view_list"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="employee_id" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="hr_skills.hr_employee_skill_report_action" model="ir.actions.act_window">
+            <field name="name">Member Skills</field>
+        </record>
+
+        <record id="hr_skills_survey.hr_employee_certification_report_action" model="ir.actions.act_window">
+            <field name="name">Member Certifications</field>
+        </record>
+
+        <record id="hr_skills_survey_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_skills_survey_tree_inherited</field>
+            <field name="model">hr.resume.line</field>
+            <field name="inherit_id" ref="hr_skills_survey.hr_employee_certification_report_view_list"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="employee_id" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="hr_skills_survey_form_inherited" model="ir.ui.view">
+            <field name="name">hr_skills_survey_form_inherited</field>
+            <field name="model">hr.resume.line</field>
+            <field name="inherit_id" ref="hr_skills.resume_line_view_form"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="employee_id" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="hr_department_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_department_tree_inherited</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr.view_department_tree"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="total_employee" position="attributes">
+                    <attribute name="string">Members</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="hr.open_view_categ_form" model="ir.actions.act_window">
+            <field name="name">Member Tags</field>
+        </record>
+
+        <record id="hr.hr_contract_type_action" model="ir.actions.act_window">
+            <field name="name">Member Types</field>
+        </record>
+
+        <record id="hr.menu_view_hr_contract_type" model="ir.ui.menu">
+            <field name="name">Member Types</field>
+        </record>
+
+        <!--        Changing In Templates UnderContracts!-->
+        <record id="hr_contract_templates_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_contract_templates_tree_inherited</field>
+            <field name="model">hr.contract</field>
+            <field name="inherit_id" ref="hr_contract_salary.hr_contract_view_tree_contract_templates"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="employee_id" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </field>
+                <field name="department_id" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="res_config_settings_view_form_for_member" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.hr.for.member</field>
+            <field name="model">res.config.settings</field>
+            <field name="priority" eval="70"/>
+            <field name="inherit_id" ref="hr.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form//app[@name='hr']" position="attributes">
+                    <attribute name="string">Members</attribute>
+                </xpath>
+                <xpath expr="//form//app//block[@name='employees_setting_container']" position="attributes">
+                    <attribute name="title">Members</attribute>
+                </xpath>
+                <xpath expr="//form//app//block[@name='employee_rights_setting_container']" position="attributes">
+                    <attribute name="title">Member Update Rights</attribute>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

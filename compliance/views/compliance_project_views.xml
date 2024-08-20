@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <!-- Inherit the Kanban View of project.project -->
+        <record id="view_compliance_kanban" model="ir.ui.view">
+            <field name="name">compliance.kanban</field>
+            <field name="model">project.project</field>
+            <field name="inherit_id" ref="project.project_view_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//kanban" position="attributes">
+                    <attribute name="model">compliance</attribute>
+                </xpath>
+                <xpath expr="//templates" position="inside">
+                    <t t-if="record.is_compliance.raw_value">
+                        <div class="badge badge-compliance">Compliance</div>
+                    </t>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

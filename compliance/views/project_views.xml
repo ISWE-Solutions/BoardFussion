@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <record id="view_project_form_inherit_compliance" model="ir.ui.view">
+            <field name="name">project.project.form.inherit.compliance</field>
+            <field name="model">project.project</field>
+            <field name="inherit_id" ref="project.edit_project"/>
+            <field name="arch" type="xml">
+                <field name="label_tasks" position="before">
+                    <field name="is_compliance" invisible="1"/>
+                    <field name="compliance_tag" invisible="not is_compliance"/>
+                </field>
+
+                <xpath expr="//div/h1/field[@name='name']" position="replace">
+                    <field name="name" options="{'line_breaks': False}" widget="text" class="o_text_overflow"
+                           placeholder="e.g. Example Compliance" invisible="not is_compliance"/>
+
+                    <field name="name" options="{'line_breaks': False}" widget="text" class="o_text_overflow"
+                           placeholder="e.g. Example Action Point" invisible="is_compliance"/>
+                </xpath>
+
+                <xpath expr="//notebook/page/field[@name='description']" position="replace">
+                    <field name="description" options="{'resizable': false}" placeholder="Action Point description..."
+                           invisible="is_compliance"/>
+
+                    <field name="description" options="{'resizable': false}" placeholder="Compliance description..."
+                           invisible="not is_compliance"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

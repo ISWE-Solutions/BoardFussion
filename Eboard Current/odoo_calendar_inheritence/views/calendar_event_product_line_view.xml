@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="calendar_event_product_line_form_view" model="ir.ui.view">
+        <field name="name">calendar.event.product.line.form.view</field>
+        <field name="model">calendar.event.product.line</field>
+        <field name="arch" type="xml">
+            <form string="Agenda Form">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="description" placeholder="Agenda Item"/>
+                            <field name="presenter_id" widget="many2many_tags" options="{'no_create': True}"
+                                   placeholder="Presenters"/>
+                            <field name="pdf_attachment" widget="many2many_binary"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="calendar_event_product_line_tree_view" model="ir.ui.view">
+        <field name="name">calendar.event.product.line.tree.view</field>
+        <field name="model">calendar.event.product.line</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="description" string="Agenda Item"/>
+                <field name="product_id" column_invisible="1"/>
+                <field name="presenter_id" widget="many2many_tags"/>
+                <button name="action_open_documents" string="Attachments" type="object"
+                        icon="fa-file-text-o"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_calendar_event_product_line" model="ir.actions.act_window">
+        <field name="name">Agendas</field>
+        <field name="res_model">calendar.event.product.line</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('calendar_id', '=', active_id)]</field>
+        <field name="context">{'default_calendar_id': active_id}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Agenda!
+            </p>
+        </field>
+    </record>
+
+    <record id="action_calendar_event_product_line_form" model="ir.actions.act_window">
+        <field name="name">Agendas Form</field>
+        <field name="res_model">calendar.event.product.line</field>
+        <field name="view_mode">form</field>
+        <field name="domain">[('calendar_id', '=', active_id)]</field>
+        <field name="context">{'default_calendar_id': active_id}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Agenda!
+            </p>
+        </field>
+    </record>
+</odoo>

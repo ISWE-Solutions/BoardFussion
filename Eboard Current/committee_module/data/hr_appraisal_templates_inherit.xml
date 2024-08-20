@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Inherit the hr appraisal templates -->
+        <template id="custom_hr_appraisal_report" inherit_id="hr_appraisal.hr_appraisal_employee_feedback">
+            <xpath expr="//h2/h3" position="inside">
+                <h3>What are my best achievement(s) since my last evaluation?</h3>
+            </xpath>
+        </template>
+    </data>
+</odoo>

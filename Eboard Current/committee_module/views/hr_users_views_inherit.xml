@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <!-- Inherit and rename the tree view -->
+        <record id="res_users_view_form_profile_inherit" model="ir.ui.view">
+            <field name="name">res.users.view.form.profile.inherit</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="hr.res_users_view_form_profile"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='work_location_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='employee_parent_id']" position="attributes">
+                    <attribute name="string">Reporting</attribute>
+                </xpath>
+                <xpath expr="//field[@name='coach_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+
+                <xpath expr="//page[@name='public']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+
+                <xpath expr="//group[@name='identification_group']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='employee_type']" position="before">
+                    <field name="member_type"/>
+                </xpath>
+                <xpath expr="//field[@name='employee_type']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_send_appraisal_request']" position="attributes">
+                    <attribute name="string">Request Evaluation</attribute>
+                </xpath>
+                <xpath expr="//field[@name='employee_country_id']" position="attributes">
+                    <attribute name="string">Member's Country</attribute>
+                </xpath>
+                <xpath expr="//field[@name='employee_bank_account_id']" position="attributes">
+                    <attribute name="string">Member's Bank Account Number</attribute>
+                </xpath>
+            </field>
+        </record>
+
+    <record id="res_users_view_form_profile_inherit_2" model="ir.ui.view">
+            <field name="name">res.users.view.form.profile.inherit.2</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="hr.res_users_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='action_create_employee']" position="attributes">
+                    <attribute name="string">Create Member</attribute>
+                </xpath>
+            </field>
+    </record>
+</odoo>

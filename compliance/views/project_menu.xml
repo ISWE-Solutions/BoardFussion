@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <menuitem id="menu_compliance_root" name="Compliance" parent="project.menu_main_pm" action="action_compliance_projects" sequence="1"/>
+<!--    <menuitem id="menu_compliance_projects" name="Compliance Projects" parent="menu_compliance_root"-->
+<!--              action="action_compliance_projects" sequence="1"/>-->
+
+<!--    <menuitem id="menu_my_tasks" name="My Tasks" parent="project.menu_main_pm" sequence="5"/>-->
+    <menuitem id="menu_project_tasks" name="Action Points Tasks" parent="project.menu_project_management_my_tasks" action="action_project_tasks"
+              sequence="1"/>
+    <menuitem id="menu_compliance_tasks" name="Compliance Tasks" parent="project.menu_project_management_my_tasks" action="action_compliance_tasks"
+              sequence="2"/>
+</odoo>

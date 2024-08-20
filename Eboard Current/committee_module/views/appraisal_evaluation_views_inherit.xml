@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="hr_appraisal.menu_hr_appraisal_root" model="ir.ui.menu">
+            <field name="name">Evaluation</field>
+        </record>
+        <record id="hr_appraisal.menu_open_view_hr_appraisal_tree" model="ir.ui.menu">
+            <field name="name">Evaluation</field>
+        </record>
+
+        <record id="hr_appraisal.open_view_hr_appraisal_tree" model="ir.actions.act_window">
+            <field name="name">Evaluation</field>
+        </record>
+
+        <record id="hr_appraisal_tree_inherited" model="ir.ui.view">
+            <field name="name">hr_appraisal_tree_inherited</field>
+            <field name="model">hr.appraisal</field>
+            <field name="inherit_id" ref="hr_appraisal.view_hr_appraisal_tree"/>
+            <field name="arch" type="xml">
+                <!-- Add a new field to the tree view -->
+                <field name="date_close" position="attributes">
+                    <attribute name="string">Evaluation Date</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_search_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.search.inherit</field>
+            <field name="model">hr.appraisal</field>
+            <field name="inherit_id" ref="hr_appraisal.hr_appraisal_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search//searchpanel//field[@name='department_id']" position="attributes">
+                    <attribute name="string">Committees</attribute>
+                </xpath>
+
+                <xpath expr="//search//filter[@name='my_appraisals'][2]" position="attributes">
+                    <attribute name="string">My Evaluations</attribute>
+                </xpath>
+
+                <xpath expr="//search//group//filter[@name='employee']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+
+                <xpath expr="//search//group//filter[@name='groupby_date_close']" position="attributes">
+                    <attribute name="string">Evaluation Date</attribute>
+                </xpath>
+
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_form_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.form.inherit</field>
+            <field name="model">hr.appraisal</field>
+            <field name="inherit_id" ref="hr_appraisal.view_hr_appraisal_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form//field[@name='manager_ids']" position="attributes">
+                    <attribute name="string">Reporter</attribute>
+                </xpath>
+                <xpath expr="//form//field[@name='date_close']" position="attributes">
+                    <attribute name="string">Evaluation Date</attribute>
+                </xpath>
+                <xpath expr="//form//notebook//page[@name='appraisal']" position="attributes">
+                    <attribute name="string">Evaluation</attribute>
+                </xpath>
+
+                <xpath expr="//form//notebook//page//h3" position="replace">
+                    <h3 id="as-2">Member's Feedback</h3>
+                </xpath>
+
+                <xpath expr="//form//field[@name='department_id']" position="after">
+                    <field name="committees_ids" widget="many2many_tags" string="Committees"/>
+                </xpath>
+
+                <xpath expr="//form//field[@name='department_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//form/sheet/notebook/page[@name='appraisal']//div[@class='o_appraisal_feedback o_appraisal_manager_feedback col-12 col-md-6']/div[@class='row']/div/h3"
+                       position="replace">
+                    <h3>Reporter's Feedback</h3>
+                </xpath>
+
+                <xpath expr="//form//sheet//button[@name='action_open_employee_appraisals']" position="replace">
+                    <button class="oe_stat_button"
+                            name="action_open_employee_appraisals"
+                            groups="hr.group_hr_user"
+                            icon="fa-star-half-o" type="object"
+                            invisible="employee_appraisal_count &lt; 2 or not employee_id">
+                        <div class="o_field_widget o_stat_info">
+                            <span class="o_stat_value">
+                                <field name="employee_appraisal_count"/>
+                            </span>
+                            <span class="o_stat_text">Evaluations</span>
+                        </div>
+                    </button>
+                </xpath>
+<!--                <xpath expr="//field[@name='next_appraisal_date']" position="attributes">-->
+<!--                    <attribute name="string">Next Evaluation Date</attribute>-->
+<!--                </xpath>-->
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_goal_tree_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.goal.tree.inherit</field>
+            <field name="model">hr.appraisal.goal</field>
+            <field name="inherit_id" ref="hr_appraisal.hr_appraisal_goal_view_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//tree//field[@name='employee_id']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+
+                <xpath expr="//tree//field[@name='manager_id']" position="attributes">
+                    <attribute name="string">Reporter</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_goal_form_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.goal.form.inherit</field>
+            <field name="model">hr.appraisal.goal</field>
+            <field name="inherit_id" ref="hr_appraisal.hr_appraisal_goal_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form//field[@name='employee_id']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+
+                <xpath expr="//form//field[@name='manager_id']" position="attributes">
+                    <attribute name="string">Reporter</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_goal_graph_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.goal.graph.inherit</field>
+            <field name="model">hr.appraisal.goal</field>
+            <field name="inherit_id" ref="hr_appraisal.hr_appraisal_goal_view_graph"/>
+            <field name="arch" type="xml">
+                <xpath expr="//graph//field[@name='employee_id']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr_appraisal.menu_appraisal_analysis_report" model="ir.ui.menu">
+            <field name="name">Evaluation Analysis</field>
+        </record>
+
+        <record id="view_hr_appraisal_report_search_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.report.search.inherit</field>
+            <field name="model">hr.appraisal.report</field>
+            <field name="inherit_id" ref="hr_appraisal.view_appraisal_report_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search//filter[@name='appraisal_sent']" position="attributes">
+                    <attribute name="string">Evaluation Sent</attribute>
+                </xpath>
+
+                <xpath expr="//search//group//filter[@name='employee']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+
+                <xpath expr="//search//group//filter[@name='department']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+
+
+            </field>
+        </record>
+
+        <record id="hr_appraisal_skills.hr_appraisal_skill_report_action" model="ir.actions.act_window">
+            <field name="name">Evaluation Skills Report</field>
+        </record>
+
+        <record id="view_hr_appraisal_skills_report_tree_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.skills.report.tree.inherit</field>
+            <field name="model">hr.appraisal.skill.report</field>
+            <field name="inherit_id" ref="hr_appraisal_skills.hr_appraisal_skill_report_view_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//tree//field[@name='employee_id']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_hr_appraisal_skills_report_search_inherit" model="ir.ui.view">
+            <field name="name">hr.appraisal.skills.report.search.inherit</field>
+            <field name="model">hr.appraisal.skill.report</field>
+            <field name="inherit_id" ref="hr_appraisal_skills.hr_appraisal_skill_report_view_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search//filter[@name='department']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+                <xpath expr="//search//filter[@name='employee']" position="attributes">
+                    <attribute name="string">Member</attribute>
+                </xpath>
+            </field>
+        </record>
+
+
+        <record id="res_config_settings_view_form_for_hr_appraisal" model="ir.ui.view">
+            <field name="name">res.config.settings.hr.appraisal.view.form.inherit.hr.for.hr_appraisal</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="hr_appraisal.res_config_settings_view_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form//app[@name='hr_appraisal']" position="attributes">
+                    <attribute name="string">Evaluation</attribute>
+                </xpath>
+                <xpath expr="/form/app[@name='hr_appraisal']//block[2]" position="attributes">
+                    <attribute name="title">Evaluations</attribute>
+                </xpath>
+
+                <xpath expr="/form/app[@name='hr_appraisal']//block[2]/div[@class='alert alert-warning']"
+                       position="replace">
+                    <div class="alert alert-warning" role="alert" invisible="not appraisal_plan">
+                        When the Evaluations plan is saved, it will overwrite all empty Next Evaluation Dates for every
+                        member.
+                    </div>
+                </xpath>
+
+                <!--                <xpath expr="/form/app[@name='hr_appraisal']//block[2]/div[@class='alert alert-warning']//setting"-->
+                <!--                       position="attributes">-->
+                <!--                    <attribute name="help">Automatically generate evaluations</attribute>-->
+                <!--                </xpath>-->
+
+                <xpath expr="/form/app[@name='hr_appraisal']//field[@name='appraisal_plan']" position="attributes">
+                    <attribute name="string">Evaluations Plans</attribute>
+                </xpath>
+
+                <!--                <xpath expr="//form//app//block[@name='employee_rights_setting_container']" position="attributes">-->
+                <!--                    <attribute name="title">Member Update Rights</attribute> expr="/form/app[@name='hr_appraisal']/block/setting/block -->
+                <!--                </xpath>-->
+            </field>
+        </record>
+
+
+    </data>
+</odoo>

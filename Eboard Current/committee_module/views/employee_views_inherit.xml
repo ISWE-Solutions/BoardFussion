@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="hr_employee_inherit_form_view_appraisal_extended" model="ir.ui.view">
+            <field name="name">hr.employee.inherit.form.view.appraisal.extended</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_appraisal.hr_employee_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form//button[@name='action_send_appraisal_request'][2]" position="attributes">
+                    <attribute name="string">Request Evaluation</attribute>
+                </xpath>
+                <xpath expr="//form//button[@name='action_open_last_appraisal']" position="replace">
+                    <div name="button_box" position="inside">
+                        <field name="appraisal_count" invisible="1"/>
+                        <field name="ongoing_appraisal_count" invisible="1"/>
+                        <field name="last_appraisal_id" invisible="1"/>
+                        <button name="action_open_last_appraisal"
+                                class="oe_stat_button" invisible="not last_appraisal_id"
+                                icon="fa-star-half-o"
+                                type="object">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="last_appraisal_date" readonly="1"/>
+                                </span>
+                                <span class="o_stat_text">
+                                    Last Evaluation
+                                </span>
+                            </div>
+                        </button>
+                    </div>
+                </xpath>
+                <xpath expr="//field[@name='next_appraisal_date']" position="attributes">
+                    <attribute name="string">Next Evaluation Date</attribute>
+                </xpath>
+            </field>
+        </record>
+        <record id="hr_employee_inherit_form_view" model="ir.ui.view">
+            <field name="name">hr.employee.inherit.form.view</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+
+                <xpath expr="//sheet/group/group[1]/field[@name='company_id']" position="before">
+                    <field name="committees_ids" widget="many2many_tags" string="Committees"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Inherit and rename the tree view -->
+        <record id="view_employee_tree_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.tree.inherit</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='department_id']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+                <xpath expr="//field[@name='parent_id']" position="attributes">
+                    <attribute name="string">Committee Chairperson</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_employee_search_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.search.inherit</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//filter[@name='my_department']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//filter[@name='newly_hired']" position="attributes">
+                    <attribute name="string">New Members</attribute>
+                </xpath>
+                <xpath expr="//filter[@name='group_manager']" position="attributes">
+                    <attribute name="string">Reporting</attribute>
+                </xpath>
+                <xpath expr="//filter[@name='group_department']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_employee_form_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.form.inherit</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//sheet//group//field[@name='department_id']" position="attributes">
+                    <attribute name="string">Committee</attribute>
+                </xpath>
+                <xpath expr="//page[@name='public']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='passport_id']" position="attributes">
+                    <attribute name="string">TPIN</attribute>
+                </xpath>
+                <xpath expr="//field[@name='lang']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='km_home_work']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='private_car_plate']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//div[@name='div_km_home_work']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <!--                Removing Work Permit from Employee Form View-->
+                <xpath expr="//separator[@name='has_work_permit']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='visa_no']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='permit_no']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='visa_expire']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='work_permit_expiration_date']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <!--                <xpath expr="//field[@name='work_permit_name']" position="attributes">-->
+                <!--                    <attribute name="invisible">1</attribute>-->
+                <!--                </xpath>-->
+                <xpath expr="//field[@name='has_work_permit']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <!--                Hamza's work-->
+                <xpath expr="//field[@name='department_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='coach_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='parent_id']" position="attributes">
+                    <attribute name="string">Reporting</attribute>
+                </xpath>
+                <xpath expr="//group[@name='identification_group']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//page[@name='hr_settings']" position="attributes">
+                    <attribute name="string">Member Settings</attribute>
+                </xpath>
+                <xpath expr="//page[@name='public']" position="attributes">
+                    <attribute name="string">Resume Collins</attribute>
+                </xpath>
+                <xpath expr="//page[@name='received_badges']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//page[@name='hr_settings']//group[@name='active_group']//field[@name='user_id']"
+                       position="before">
+                    <field name="member_type"/>
+                </xpath>
+                <xpath expr="//page[@name='hr_settings']//group[@name='active_group']//field[@name='employee_type']"
+                       position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//form//sheet//page[@name='hr_settings']//group[@name='identification_group']"
+                       position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <!--                <xpath expr="//field[@name='next_appraisal_date']" position="attributes">-->
+                <!--                    <attribute name="string">Next Evaluation Date</attribute>-->
+                <!--                </xpath>-->
+            </field>
+        </record>
+
+        <!-- Collins -->
+        <record id="hr_hr_employee_view_form3_inherit" model="ir.ui.view">
+            <field name="name">hr.hr.employee.view.form3.inherit</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_contract.hr_hr_employee_view_form3"/>
+            <field name="priority" eval="3"/>
+            <field name="arch" type="xml">
+                <data>
+                    <!-- Update the title and text for 'In Contract Since' -->
+                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][1]/span[@class='o_stat_text text-success']"
+                           position="attributes">
+                        <attribute name="title">In Tenure Since</attribute>
+                    </xpath>
+                    <!--                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][1]/span[@class='o_stat_text text-success']"-->
+                    <!--                           position="replace">-->
+                    <!--                        <span class="o_stat_text text-success" title="In Tenure Since">In Tenure Since</span>-->
+                    <!--                    </xpath>-->
+                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][1]/span[@class='o_stat_text text-danger']"
+                           position="attributes">
+                        <attribute name="title">In Tenure Since</attribute>
+                    </xpath>
+                    <!--                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][1]/span[@class='o_stat_text text-danger']"-->
+                    <!--                           position="replace">-->
+                    <!--                        <span class="o_stat_text text-danger" title="In Tenure Since">In Tenure Since</span>-->
+                    <!--                    </xpath>-->
+                    <!-- Update the text for 'Contract' and 'Contracts' -->
+                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][2]/span[@class='o_stat_text text-danger'][@invisible='contracts_count != 1']"
+                           position="replace">
+                        <span class="o_stat_text text-danger" invisible="contracts_count != 1">Tenure</span>
+                    </xpath>
+                    <xpath expr="//button[@name='action_open_contract']/div[@class='o_stat_info'][2]/span[@class='o_stat_text text-danger'][@invisible='contracts_count == 1']"
+                           position="replace">
+                        <span class="o_stat_text text-danger" invisible="contracts_count == 1">Tenures</span>
+                    </xpath>
+                </data>
+            </field>
+        </record>
+
+
+        <record id="hr_contract_view_form_inherit" model="ir.ui.view">
+            <field name="name">hr.contract.form.inherit</field>
+            <field name="model">hr.contract</field>
+            <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
+            <field name="arch" type="xml">
+
+                <xpath expr="//field[@name='name']" position="attributes">
+                    <attribute name="placeholder">Tenure Reference</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='date_start']" position="attributes">
+                    <attribute name="string">Tenure Start Date</attribute>
+                </xpath>
+
+                <xpath expr="//field[@name='date_end']" position="attributes">
+                    <attribute name="string">Tenure End Date</attribute>
+                </xpath>
+
+                <xpath expr="//button[@name='action_open_contract_list']" position="attributes">
+                    <attribute name="invisible">contracts_count == 0</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count == 1']"
+                       position="attributes">
+                    <attribute name="t">Tenures</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count &gt; 1']"
+                       position="attributes">
+                    <attribute name="t">Tenure</attribute>
+                </xpath>
+
+                <xpath expr="//page[@name='information']" position="attributes">
+                    <attribute name="string">Tenure Information</attribute>
+                </xpath>
+                <xpath expr="//page[@name='other']" position="attributes">
+                    <attribute name="string">Tenure Details</attribute>
+                </xpath>
+
+                <xpath expr="//group[@name='notes_group']/field[@name='notes']" position="attributes">
+                    <attribute name="placeholder">Type in notes about this tenure...</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr_employee_view_form_inherit_org_chart_update" model="ir.ui.view">
+            <field name="name">hr.employee.view.form.inherit.org_chart.update</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <data>
+                    <xpath expr="//button[@name='%(hr_org_chart.action_hr_employee_org_chart)d']/div[@class='o_stat_info']/span[@class='o_stat_text']"
+                           position="replace">
+                        <span class="o_stat_text">Hierarchy</span>
+                    </xpath>
+                </data>
+            </field>
+        </record>
+
+        <record id="hr_contract_view_form_inherit" model="ir.ui.view">
+            <field name="name">hr.contract.form.inherit</field>
+            <field name="model">hr.contract</field>
+            <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='other']/group[@name='contract_details_2']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <!--        <record id="hr_employee_view_form_inherit_hr_work_entry_hide_button" model="ir.ui.view">-->
+        <!--            <field name="name">hr.employee.view.form.inherit.hr.work.entry.hide.button</field>-->
+        <!--            <field name="model">hr.employee</field>-->
+        <!--            <field name="inherit_id" ref="hr.employee.hr_employee_view_form"/>-->
+        <!--            <field name="arch" type="xml">-->
+        <!--                <xpath expr="button[@id='open_work_entries']" position="attributes">-->
+        <!--                    <attribute name="invisible">1</attribute>-->
+        <!--                </xpath>-->
+        <!--            </field>-->
+        <!--        </record>-->
+
+
+    </data>
+</odoo>
