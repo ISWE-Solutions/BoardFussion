@@ -17,7 +17,6 @@
             <field name="model">hr.appraisal</field>
             <field name="inherit_id" ref="hr_appraisal.view_hr_appraisal_tree"/>
             <field name="arch" type="xml">
-                <!-- Add a new field to the tree view -->
                 <field name="date_close" position="attributes">
                     <attribute name="string">Evaluation Date</attribute>
                 </field>
@@ -48,13 +47,26 @@
             </field>
         </record>
 
+<!--        <record id="hr_appraisal_report.menu_appraisal_analysis_report" model="ir.actions.act_window">-->
+<!--            <field name="name">Evaluation Analysis</field>-->
+<!--        </record>-->
+
+        <!--        <record id="action_appraisal_report_all" model="ir.actions.act_window">-->
+        <!--            <field name="name">Custom Appraisal Report</field>-->
+        <!--            <field name="res_model">hr.appraisal.report</field>-->
+        <!--            <field name="view_mode">gantt,calendar,graph,pivot</field>-->
+        <!--            <field name="context">{'search_default_department':1,'group_by_no_leaf':1,'group_by':[]}</field>-->
+        <!--            <field name="search_view_id" ref="hr_appraisal.view_appraisal_report_search"/>-->
+        <!--        </record>-->
+
+
         <record id="view_hr_appraisal_form_inherit" model="ir.ui.view">
             <field name="name">hr.appraisal.form.inherit</field>
             <field name="model">hr.appraisal</field>
             <field name="inherit_id" ref="hr_appraisal.view_hr_appraisal_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//form//field[@name='manager_ids']" position="attributes">
-                    <attribute name="string">Reporter</attribute>
+                    <attribute name="string">Evaluator</attribute>
                 </xpath>
                 <xpath expr="//form//field[@name='date_close']" position="attributes">
                     <attribute name="string">Evaluation Date</attribute>
@@ -76,8 +88,47 @@
                 </xpath>
                 <xpath expr="//form/sheet/notebook/page[@name='appraisal']//div[@class='o_appraisal_feedback o_appraisal_manager_feedback col-12 col-md-6']/div[@class='row']/div/h3"
                        position="replace">
-                    <h3>Reporter's Feedback</h3>
+                    <h3>Evaluator's Feedback</h3>
                 </xpath>
+
+                <xpath expr="//div[@class='col-12 o_appraisal_input position-relative']/span[@class='o_appraisal_overlay']/div[text()='Manager Assessment will show here']"
+                       position="replace">
+                    <div>Evaluator Assessment will show here</div>
+                </xpath>
+
+                <xpath expr="//span[@class='o_appraisal_overlay'][contains(text(), 'Skills tab will be active once the appraisal is confirmed.')]"
+                       position="replace">
+                    <span>Skills tab will be active once the Evaluation is confirmed.</span>
+                </xpath>
+
+                <xpath expr="//span[text()='Not Visible to Manager']" position="replace">
+                    <span class="text-end" invisible="employee_feedback_published">Not Visible to Evaluator
+                    </span>
+                </xpath>
+                <xpath expr="//span[text()='Visible to Manager']" position="replace">
+                    <span class="text-end" invisible="not employee_feedback_published or state == 'new'">Visible
+                        to Evaluator
+                    </span>
+                </xpath>
+                <xpath expr="//span[text()='Not Visible to Employee']" position="replace">
+                    <span class="text-end"
+                          invisible="manager_feedback_published or not can_see_manager_publish">Not Visible to
+                        Member
+                    </span>
+                </xpath>
+                <xpath expr="//span[text()='Visible to Employee']" position="replace">
+                    <span class="text-end"
+                          invisible="not manager_feedback_published or not can_see_manager_publish">Visible to
+                        Member
+                    </span>
+                </xpath>
+
+                <xpath expr="//span[text()='Visible &amp; Editable by Manager']" position="replace">
+                    <span class="text-end" invisible="not employee_feedback_published or state != 'new'">Visible
+                        &amp; Editable by Evaluator
+                    </span>
+                </xpath>
+
 
                 <xpath expr="//form//sheet//button[@name='action_open_employee_appraisals']" position="replace">
                     <button class="oe_stat_button"
@@ -93,11 +144,25 @@
                         </div>
                     </button>
                 </xpath>
-<!--                <xpath expr="//field[@name='next_appraisal_date']" position="attributes">-->
-<!--                    <attribute name="string">Next Evaluation Date</attribute>-->
-<!--                </xpath>-->
             </field>
         </record>
+
+        <record id="res_config_settings_view_member_form" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.hr.appraisal.custom</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="hr_appraisal.res_config_settings_view_employee_form"/>
+            <field name="arch" type="xml">
+                <!-- Update the Employee Feedback Template label -->
+                <xpath expr="//field[@name='appraisal_employee_feedback_template']" position="attributes">
+                    <attribute name="string">Member Feedback Template</attribute>
+                </xpath>
+                <!-- Update the Manager Feedback Template label -->
+                <xpath expr="//field[@name='appraisal_manager_feedback_template']" position="attributes">
+                    <attribute name="string">Evaluator Feedback Template</attribute>
+                </xpath>
+            </field>
+        </record>
+
 
         <record id="view_hr_appraisal_goal_tree_inherit" model="ir.ui.view">
             <field name="name">hr.appraisal.goal.tree.inherit</field>
@@ -215,18 +280,10 @@
                     </div>
                 </xpath>
 
-                <!--                <xpath expr="/form/app[@name='hr_appraisal']//block[2]/div[@class='alert alert-warning']//setting"-->
-                <!--                       position="attributes">-->
-                <!--                    <attribute name="help">Automatically generate evaluations</attribute>-->
-                <!--                </xpath>-->
-
                 <xpath expr="/form/app[@name='hr_appraisal']//field[@name='appraisal_plan']" position="attributes">
                     <attribute name="string">Evaluations Plans</attribute>
                 </xpath>
 
-                <!--                <xpath expr="//form//app//block[@name='employee_rights_setting_container']" position="attributes">-->
-                <!--                    <attribute name="title">Member Update Rights</attribute> expr="/form/app[@name='hr_appraisal']/block/setting/block -->
-                <!--                </xpath>-->
             </field>
         </record>
 

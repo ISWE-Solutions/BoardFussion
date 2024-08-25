@@ -6,6 +6,7 @@ class HrEmployee(models.Model):
     committees_ids = fields.Many2many('hr.department', string="Committees")
     job_id = fields.Many2one('hr.job', string="Title")
     registration_number = fields.Char(string="Registration Number of the Member")
+    next_appraisal_date = fields.Date(string="Next Evaluation Date")
 
     employee_type = fields.Selection([
         ('member','Member'),
@@ -35,7 +36,15 @@ class HrEmployeePublic(models.Model):
     _inherit = 'hr.employee.public'
     _description = 'Members'
 
-    committees_ids = fields.Many2many('hr.department', string="Committees")
+    committees_ids = fields.Many2many(
+        'hr.department',
+        'hr_department_hr_employee_public_rel',  # Relation table name
+        'employee_id',  # Field name in relation table for hr.employee.public
+        'department_id',  # Field name in relation table for hr.department
+        string="Committees"
+    )
+
+
     job_id = fields.Many2one('hr.job', string="Title")
     department_id = fields.Many2one('hr.department', string="Committee")
     parent_id = fields.Many2one(invisible="True")
@@ -78,3 +87,16 @@ class HrContract(models.Model):
     sign_template_id = fields.Many2one(string='New Tenure Document Template')
     contract_update_template_id = fields.Many2one(string='Tenure Update Document Template')
     hr_responsible_id = fields.Many2one(string='Responsible')
+
+
+class HrTimesheet(models.Model):
+    _inherit = 'account.analytic.line'
+
+    employee_id = fields.Many2one(string='Member')
+    project_id = fields.Many2one(string='Action Point')
+
+
+class Onboarding(models.Model):
+    _inherit = 'mail.activity.plan.template'
+
+    employee_role_id = fields.Many2one(string='Member Role')

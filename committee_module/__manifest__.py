@@ -35,10 +35,11 @@ Long description of module's purpose
         "views/hr_users_views_inherit.xml",
         "views/mail_activity_plan_views_inheirt.xml",
         "views/appraisal_evaluation_views_inherit.xml",
-        "views/hr_users_views_inherit.xml",
         "views/contract_views_inherit.xml",
         "views/hr_payroll_view_inherit.xml",
         "views/projects.xml",
+        "views/config.xml",
+        "views/survey.xml",
         # views/web_UserMenu_views.xml",
         "views/product_document_views.xml"
     ],

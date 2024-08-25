@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Inheriting the existing template -->
+    <template id="custom_website_sale_brand_promotion" inherit_id="website_sale.brand_promotion">
+        <xpath expr="//t[@t-call='web.brand_promotion_message']" position="replace">
+            <t t-call="web.brand_promotion_message">
+                <!-- Customizing the message -->
+                <t t-set="_message">
+                    <a target="_blank" href="https://iswesolutions.com/">Board Fusion</a>
+                </t>
+                <!-- Adjusting the utm_medium parameter -->
+                <t t-set="_utm_medium" t-value="'website'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="custom_brand_promotion_message" inherit_id="web.brand_promotion_message">
+        <!-- Modify the odoo_logo variable -->
+        <xpath expr="//t[@t-set='odoo_logo']" position="replace">
+            <t t-set="odoo_logo">
+                <a target="_blank"
+                   t-attf-href="http://www.yourwebsite.com?utm_source=db&amp;utm_medium=#{_utm_medium}"
+                   class="badge text-bg-light">
+                    <img alt="ISWE"
+                         src=""
+                         width="0" height="0"
+                         style=""/>
+                </a>
+            </t>
+        </xpath>
+
+        <!-- Modify the final message if necessary -->
+        <xpath expr="//t[@t-set='final_message']" position="replace">
+            <t t-set="final_message">Powered by %s%s</t>
+        </xpath>
+    </template>
+
+    <template id="custom_mail_notification_layout" inherit_id="mail.mail_notification_layout">
+        <!-- Modify the div with custom content -->
+        <xpath expr="//div[@style='color: #555555; font-size:11px;']" position="replace">
+            <div style="color: #333333; font-size:11px;">
+                Powered by
+                <a target="_blank" href="https://www.yourwebsite.com?utm_source=db&amp;utm_medium=email"
+                   t-att-style="'color: ' + (company.email_secondary_color or '#333333') + ';'">Iswe Board Fusion
+                </a>
+                <span id="mail_unfollow">
+                    |
+                    <a href="/mail/unfollow" style="text-decoration:none; color:#333333;"></a>
+                </span>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="custom_mail_notification_light" inherit_id="mail.mail_notification_light">
+        <!-- Modify the <tr> with custom content -->
+        <xpath expr="//tr[td[contains(text(), 'Powered by')]]" position="replace">
+            <tr>
+                <td align="center" style="min-width: 590px;">
+                    Powered by
+                    <a target="_blank" href="https://www.yourwebsite.com?utm_source=db&amp;utm_medium=email"
+                       t-att-style="'color: ' + (company.email_secondary_color or '#333333') + ';'">Iswe Board Fusion
+                    </a>
+                    <span id="mail_unfollow">
+                        |
+                        <a href="/mail/unfollow" style="text-decoration:none; color:#333333;"></a>
+                    </span>
+                </td>
+            </tr>
+        </xpath>
+    </template>
+
+    <record id="res_users_view_form_member" model="ir.ui.view">
+        <field name="name">res.users.form.member.inherit</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header/button[@name='action_create_employee']" position="attributes">
+                <attribute name="string">Create member</attribute>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']/button[@name='action_open_employees']/field[@name='employee_count']"
+                   position="attributes">
+                <attribute name="string">Member</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

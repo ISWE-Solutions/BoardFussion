@@ -5,8 +5,8 @@ from odoo.exceptions import UserError, ValidationError
 class SurveyUserInput(models.Model):
     _inherit = 'survey.user_input'
     view_evaluation = fields.Char(string='view evaluation')
-    employee_id = fields.Many2one('hr.employee', string='Employee')
-
+    employee_id = fields.Many2one('hr.employee', string='Member')
+    partner_id = fields.Many2one('res.partner', string="Member")
     def action_appraisal(self):
         for record in self:
 

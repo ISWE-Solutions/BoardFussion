@@ -5,6 +5,7 @@ class ProjectTask(models.Model):
     _inherit = 'project.task'
 
     calendar_id = fields.Many2one('calendar.event')
+    project_id = fields.Many2one(string="Action")
 
     @api.model_create_multi
     def create(self, values):
