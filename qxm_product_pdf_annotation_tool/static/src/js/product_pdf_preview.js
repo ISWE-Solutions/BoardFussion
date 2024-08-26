@@ -17,8 +17,17 @@ class ProductPDFPreview extends Component {
   }
 
   async fetchDocumentData() {
-    this.data = await this.rpc("/shop/product/document", {'document_id':this.active_id});
-  }
+            this.data = await this.rpc("/web/dataset/call_kw/product.document/get_document_data", {
+            model: 'product.document',
+            method: 'get_document_data',
+            args: [this.active_id],
+            kwargs: {},
+        });
+        console.log(this.data);
+    }
+//  async fetchDocumentData() {
+//        this.data = await this.rpc("/shop/product/document", {'document_id':this.active_id});
+//      }
 
   async initializePDF() {
       try {
@@ -269,4 +278,4 @@ class ProductPDFPreview extends Component {
   }
 }
 
-registry.category("public_components").add("qxm_product_pdf_annotation_tool.product_pdf_preview", ProductPDFPreview);
+registry.category("actions").add("qxm_product_pdf_annotation_tool.product_pdf_preview", ProductPDFPreview);

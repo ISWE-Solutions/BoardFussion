@@ -20,18 +20,18 @@ class ProductDocument(models.Model):
     ir_attachment_custom_id = fields.Many2one('ir.attachment')
 
     def merge_selected_pdfs(self):
-        print('Starting PDF merge process')
+        # print('Starting PDF merge process')
         merger = PdfFileMerger()
         for record in self:
             for attachment in record.pdf_attachment_ids:
-                print(f'Merging PDF from attachment: {attachment.name}')
+                # print(f'Merging PDF from attachment: {attachment.name}')
                 # Decode the PDF file content
                 file_content = base64.b64decode(attachment.datas)
                 file_stream = io.BytesIO(file_content)
                 try:
                     merger.append(file_stream)
                 except Exception as e:
-                    print(f'Error appending PDF: {e}')
+                    # print(f'Error appending PDF: {e}')
                     continue
 
         # Create a merged PDF
@@ -41,7 +41,7 @@ class ProductDocument(models.Model):
         merged_pdf_content = base64.b64encode(merged_stream.read())
         self.write({'merged_pdf': merged_pdf_content})
 
-        print('PDF merge process completed')
+        # print('PDF merge process completed')
         merger.close()
 
         return True

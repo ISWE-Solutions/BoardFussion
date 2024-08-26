@@ -12,4 +12,5 @@ class ProductPDFAnnotationLine(models.Model):
     layerx = fields.Char(string='LayerX')
     layery = fields.Char(string='LayerY')
     description = fields.Char(string='Description')
+    user_id = fields.Many2one('res.users', string='User', default=lambda self: self.env.user)
     document_id = fields.Many2one('product.document', string='Document')

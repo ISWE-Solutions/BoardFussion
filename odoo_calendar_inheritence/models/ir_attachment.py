@@ -4,6 +4,6 @@ class Ir_Attachment(models.Model):
     _inherit = 'ir.attachment'
 
     def unlink(self):
-        print("Executed!")
+        # print("Executed!")
         res = super(Ir_Attachment, self).unlink()
         return res

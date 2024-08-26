@@ -73,9 +73,15 @@
                 <xpath expr="//div[@name='bottom']" position="replace">
                     <div>
                         <button name="action_open_pdf_annotation" class="btn btn-primary" id="open_pdf_annotation"
-                                string="PDF Annotation"
+                                string="Add Annotations"
                                 type="object"/>
                     </div>
+                </xpath>
+
+                <xpath expr="//button[@name='action_open_pdf_annotation']" position="after">
+                    <button name="action_view_pdf_annotation" class="btn btn-danger mt-2" id="preview_pdf_annotation"
+                            string="Preview Annotations"
+                            type="object"/>
                 </xpath>
             </field>
         </record>

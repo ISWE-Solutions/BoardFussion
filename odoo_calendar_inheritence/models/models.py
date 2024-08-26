@@ -94,6 +94,7 @@ class OdooCalendarInheritence(models.Model):
     company_logo = fields.Image()
     is_meeting_finished = fields.Boolean(default=False)
     is_description_created = fields.Boolean(default=False)
+    document_count = fields.Integer(compute='_compute_document_count')
 
     @api.depends('product_line_ids')
     def _compute_agenda_count(self):
@@ -138,7 +139,7 @@ class OdooCalendarInheritence(models.Model):
         # print(self._context.get('dont_create_nested'))
         for rec in values:
             if not rec.get('nested_calender'):
-                print("Here NOT")
+                # print("Here NOT")
                 seq_product = self.env['ir.sequence'].next_by_code('knowledge.article.sequence')
                 product_values = {
                     'name': seq_product,
@@ -153,7 +154,7 @@ class OdooCalendarInheritence(models.Model):
                     create_project = self.env['project.project'].sudo().create(project_values)
                     rec['project_id'] = create_project.id
                 else:
-                    print("Else")
+                    # print("Else")
                     project_values = {
                         'name': 'New Project',
                     }
@@ -722,6 +723,18 @@ class OdooCalendarInheritence(models.Model):
 
         # self.attendees_lines_ids =
 
+    def _compute_document_count(self):
+        active_user = self.env.user.partner_id.id
+        domain = [
+            '|',
+            '&', ('res_model', '=', 'product.template'), ('res_id', '=', self.product_id.id),
+            '&',
+            ('res_model', '=', 'product.template'),
+            ('res_id', 'in', self.product_id.product_variant_ids.ids),
+            ('partner_ids', 'in', [active_user]), ]
+        documents = self.env['product.document'].sudo().search(domain)
+        # print(documents)
+        self.document_count = len(documents)
     def action_open_documents(self):
         # self.ensure_one()
         company_id = self.env.company.id
@@ -828,7 +841,14 @@ class OdooCalendarInheritence(models.Model):
                         'partner_ids': [(6, 0, record.partner_ids.ids)]
                     }
                 )
-
+    def action_agenda_inv_sendmail(self):
+        email = self.env.user.email
+        if email:
+            for meeting in self:
+                meeting.attendee_ids._send_custom_mail_to_attendees(
+                    self.env.ref('odoo_calendar_inheritence.calendar_template_agenda_meeting_invitation', raise_if_not_found=False)
+                )
+        return True
 
 class AgendaLines(models.Model):
     _name = 'agenda.lines'

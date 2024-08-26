@@ -50,7 +50,7 @@ class CalendarEventProductLine(models.Model):
 
         if 'agenda' in values and values['agenda']:
             self._check_unique_agenda(values['agenda'], self.id)
-        print('------------------->',values)
+        # print('------------------->',values)
         if 'pdf_attachment' in values:
             create_doc=[]
             create_list_ids=[]
@@ -84,7 +84,7 @@ class CalendarEventProductLine(models.Model):
                     doc_res = self.env['product.document'].sudo().create(create_doc)
             if unlink_list_ids:
                 res=self.env['product.document'].sudo().search([('ir_attachment_id','in',unlink_list_ids)])
-                print('Unlink--',res)
+                # print('Unlink--',res)
                 if res:
                     res.sudo().unlink()
                 # attachment_data = attachment.datas

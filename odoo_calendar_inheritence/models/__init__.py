@@ -9,3 +9,4 @@ from . import product_document
 from . import knowledge_article
 from . import attendees_lines
 from . import ir_attachment
+from . import calendar_attendee

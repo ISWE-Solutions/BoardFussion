@@ -90,7 +90,7 @@
                 />
                 <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
                         icon="fa-file-text-o">
-
+                    <field name="document_count" widget="statinfo" string="Document"/>
                 </button>
                 <button class="oe_stat_button" type="object" invisible="not article_exists"
                         name="action_view_knowledge_article"
@@ -111,14 +111,67 @@
                     <field string="Action Points" name="action_point_count" widget="statinfo"/>
                 </button>
             </xpath>
-<!--            <xpath expr="//button[@name='action_open_composer']" position="replace"/>-->
+            <!--            <xpath expr="//button[@name='action_open_composer']" position="replace"/>-->
             <xpath expr="//button[@name='action_send_sms']" position="replace"/>
             <xpath expr="//page[@name='page_invitations']//button[@name='action_sendmail']" position="replace">
                 <button name="action_open_custom_composer" help="Send Email to attendees" type="object" string="EMAIL"
                         icon="fa-envelope" invisible="not user_can_edit"/>
             </xpath>
-            <xpath expr="//page[@name='page_invitations']" position="attributes">
-                <attribute name="invisible">1</attribute>
+            <!--            <xpath expr="//page[@name='page_invitations']" position="attributes">-->
+            <!--                <attribute name="invisible">1</attribute>-->
+            <!--            </xpath>            -->
+
+            <xpath expr="//page[@name='page_invitations']" position="replace">
+                <page name="page_invitations" string="Invitations">
+                    <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
+                            class="oe_link"/>
+                    <field name="attendee_ids" widget="one2many" mode="tree" readonly="1">
+                        <tree string="Invitation details" editable="top" create="false" delete="false">
+                            <field name="partner_id"/>
+                            <field name="email" widget="email"/>
+                            <field name="phone" widget="phone"/>
+                            <field name="state"/>
+                            <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')"
+                                    string="Uncertain" type="object" icon="fa-asterisk"/>
+                            <button name="do_accept" string="Accept"
+                                    invisible="state not in ('needsAction', 'tentative', 'declined')" type="object"
+                                    icon="fa-check text-success"/>
+                            <button name="do_decline" string="Decline"
+                                    invisible="state not in ('needsAction', 'tentative', 'accepted')" type="object"
+                                    icon="fa-times-circle text-danger"/>
+                        </tree>
+                        <kanban class="o_kanban_mobile" create="false" delete="false">
+                            <field name="partner_id"/>
+                            <field name="state"/>
+                            <field name="email" widget="email"/>
+
+                            <templates>
+                                <t t-name="kanban-box">
+                                    <div class="d-flex flex-column justify-content-between">
+                                        <field name="partner_id"/>
+                                        <field name="email" widget="email"/>
+                                        <span>Status:
+                                            <field name="state"/>
+                                        </span>
+
+                                        <div class="text-end">
+                                            <button name="do_tentative"
+                                                    invisible="state not in ('needsAction', 'declined', 'accepted')"
+                                                    string="Uncertain" type="object" class="btn fa fa-asterisk"/>
+                                            <button name="do_accept"
+                                                    invisible="state not in ('needsAction', 'tentative', 'declined')"
+                                                    string="Accept" type="object" class="btn fa fa-check text-success"/>
+                                            <button name="do_decline"
+                                                    invisible="state not in ('needsAction', 'tentative', 'accepted')"
+                                                    string="Decline" type="object"
+                                                    class="btn fa fa-times-circle text-danger"/>
+                                        </div>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </page>
             </xpath>
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda">
@@ -190,6 +243,22 @@
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                 </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--    # A Way to Hide Save & New Button from one2many field form view!-->
+    <record id="calendar_event_product_line_form_view_extended" model="ir.ui.view">
+        <field name="name">calendar.event.product.line.form.view.extended</field>
+        <field name="model">calendar.event.product.line</field>
+        <field name="inherit_id" ref="odoo_calendar_inheritence.calendar_event_product_line_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <style>
+                    .btn-primary:nth-child(2){
+                    display:none !important;
+                    }
+                </style>
             </xpath>
         </field>
     </record>

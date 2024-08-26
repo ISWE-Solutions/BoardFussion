@@ -16,6 +16,15 @@ class ProductDocument(models.Model):
                 'params': {},
             }
 
+    def action_view_pdf_annotation(self):
+        return {
+            'name': self.display_name or 'Preview PDF Annotation',
+            'type': 'ir.actions.client',
+            'tag': 'qxm_product_pdf_annotation_tool.pdf_custom_preview',
+            'target': 'current',
+            'params': {},
+        }
+
     def get_document_data(self):
         data = self.sudo().read()
         lines = self.env['product.pdf.annotation.line'].sudo().search_read([('document_id', '=', self.sudo().id)], [])

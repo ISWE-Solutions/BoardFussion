@@ -26,6 +26,9 @@
             'qxm_product_pdf_annotation_tool/static/src/scss/product_pdf_annotation.scss',
             'qxm_product_pdf_annotation_tool/static/src/xml/product_pdf_annotation.xml',
             'qxm_product_pdf_annotation_tool/static/src/js/product_pdf_annotation.js',
+            'qxm_product_pdf_annotation_tool/static/src/scss/product_pdf_preview.scss',
+            'qxm_product_pdf_annotation_tool/static/src/xml/pdf_custom_preview.xml',
+            'qxm_product_pdf_annotation_tool/static/src/js/pdf_custom_preview.js',
         ],
         'web.assets_frontend': [
             ('include', 'web.pdf_js_lib'),

@@ -339,6 +339,17 @@
             </field>
         </record>
 
+        <record id="view_employee_form_inherited" model="ir.ui.view">
+            <field name="name">hr.employee.form.inherited</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='name']" position="attributes">
+                    <attribute name="placeholder">Member's Name</attribute>
+                </xpath>
+            </field>
+        </record>
+
 
     </data>
 </odoo>

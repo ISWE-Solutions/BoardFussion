@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <templates xml:space="preserve">
 
-    <t t-name="qxm_product_pdf_annotation_tool.ProductPDFAnnotation">
+    <t t-name="qxm_product_pdf_annotation_tool.PDFCustomPreview">
         <Layout display="display" className="'o_dashboard h-100'">
             <div class="d-flex flex-wrap">
                 <div class="container pdf_container" style="max-width: 100%;margin: 0px;">
@@ -19,7 +19,6 @@
                                         <th scope="col" style="width: 10%;">Page.</th>
                                         <th scope="col" style="width: 10%;">Users</th>
                                         <th scope="col" style="width: 80%;">Description</th>
-                                        <th scope="col" style="width: 10%;"></th>
                                     </tr>
                                 </thead>
                                 <tbody t-ref="table_tbody">

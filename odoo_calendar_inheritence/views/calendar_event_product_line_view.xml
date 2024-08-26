@@ -4,11 +4,11 @@
         <field name="name">calendar.event.product.line.form.view</field>
         <field name="model">calendar.event.product.line</field>
         <field name="arch" type="xml">
-            <form string="Agenda Form">
+            <form create="0" delete="0" string="Agenda Form">
                 <sheet>
                     <group>
                         <group>
-                            <field name="description" placeholder="Agenda Item"/>
+                            <field name="description" required="True" placeholder="Agenda Item"/>
                             <field name="presenter_id" widget="many2many_tags" options="{'no_create': True}"
                                    placeholder="Presenters"/>
                             <field name="pdf_attachment" widget="many2many_binary"/>

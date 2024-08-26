@@ -5,8 +5,8 @@ import { registry } from "@web/core/registry";
 import { Layout } from "@web/search/layout";
 import { useService } from "@web/core/utils/hooks";
 
-class ProductPDFAnnotation extends Component {
-    static template = "qxm_product_pdf_annotation_tool.ProductPDFAnnotation";
+class PDFCustomPreview extends Component {
+    static template = "qxm_product_pdf_annotation_tool.PDFCustomPreview";
     static components = { Layout };
 
     setup() {
@@ -138,23 +138,23 @@ class ProductPDFAnnotation extends Component {
     initializeMarkers(pageNum, canvasWrapper, canvas) {
         let line_count = 0;
 
-        canvas.addEventListener('click', async event => {
-            line_count += 1;
-            const { x, y } = this.getCanvasClickPosition(event, canvas);
-            const line_id = await this.createLine(x, y, pageNum);
-            console.log('Line created', line_id);
-            const line_data = await this.orm.searchRead(
-                "product.pdf.annotation.line",
-                [
-                  ["id", "=", line_id],
-                ],
-                ["user_id"]
-              );
-            console.log(line_data);
-            const user_name= line_data[0].user_id[1];
-            // console.log(user_name);
-            this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
-        });
+//        canvas.addEventListener('click', async event => {
+//            line_count += 1;
+//            const { x, y } = this.getCanvasClickPosition(event, canvas);
+//            const line_id = await this.createLine(x, y, pageNum);
+//            console.log('Line created', line_id);
+//            const line_data = await this.orm.searchRead(
+//                "product.pdf.annotation.line",
+//                [
+//                  ["id", "=", line_id],
+//                ],
+//                ["user_id"]
+//              );
+//            console.log(line_data);
+//            const user_name= line_data[0].user_id[1];
+//            // console.log(user_name);
+//            this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
+//        });
 
         const lines = this.data.lines[pageNum] || [];
         for (const line of lines) {
@@ -163,12 +163,12 @@ class ProductPDFAnnotation extends Component {
         }
     }
 
-    getCanvasClickPosition(event, canvas) {
-        const rect = canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) - 3;
-        const y = (event.clientY - rect.top) - 4;
-        return { x, y };
-    }
+//    getCanvasClickPosition(event, canvas) {
+//        const rect = canvas.getBoundingClientRect();
+//        const x = (event.clientX - rect.left) - 3;
+//        const y = (event.clientY - rect.top) - 4;
+//        return { x, y };
+//    }
 
     createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
         console.log(user,'test');
@@ -272,8 +272,7 @@ class ProductPDFAnnotation extends Component {
         tr.innerHTML = `
             <th scope="row"><span>${pageNumber}</span></th>
             <th scope="row"><span>${user}</span></th>
-            <td><textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Description ..">${description}</textarea></td>
-            <td><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></td>
+            <td><span>${description}</span></td>
         `;
 
         tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
@@ -284,8 +283,8 @@ class ProductPDFAnnotation extends Component {
         markerDiv.onmouseout = () => this.removeHoverEffect();
         markerDiv.onclick = () => this.scrollToElement(tr);
 
-        this.initializeDeleteMarker(tr, markerDiv, rowId);
-        this.initializeSaveMarker(tr, rowId);
+//        this.initializeDeleteMarker(tr, markerDiv, rowId);
+//        this.initializeSaveMarker(tr, rowId);
 
         return tr;
     }
@@ -322,6 +321,15 @@ class ProductPDFAnnotation extends Component {
             }
         };
     }
+
+//    initializeDeleteMarker(tr, markerDiv, rowId) {
+//        const deleteIcon = tr.querySelector('.delete_marker');
+//        deleteIcon.onclick = () => {
+//            tr.remove();
+//            markerDiv.remove();
+//            this.orm.unlink("product.pdf.annotation.line", [rowId]);
+//        };
+//    }
 
     initializeSaveMarker(tr, rowId) {
         const inputField = tr.querySelector('.table_tbody_input');
@@ -362,4 +370,4 @@ class ProductPDFAnnotation extends Component {
     }
 }
 
-registry.category("actions").add("qxm_product_pdf_annotation_tool.product_pdf_annotation", ProductPDFAnnotation);
+registry.category("actions").add("qxm_product_pdf_annotation_tool.pdf_custom_preview", PDFCustomPreview);
