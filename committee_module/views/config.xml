@@ -21,10 +21,11 @@
                 <a target="_blank"
                    t-attf-href="http://www.yourwebsite.com?utm_source=db&amp;utm_medium=#{_utm_medium}"
                    class="badge text-bg-light">
-                    <img alt="ISWE"
-                         src=""
-                         width="0" height="0"
-                         style=""/>
+                    <Strong>Iswe</Strong>
+<!--                    <img alt="ISWE"-->
+<!--                         src=""-->
+<!--                         width="0" height="0"-->
+<!--                         style=""/>-->
                 </a>
             </t>
         </xpath>

@@ -1,0 +1,7 @@
+<odoo>
+    <template id="custom_calendar_popover_footer" inherit_id="web.CalendarCommonPopover.footer">
+        <xpath expr="//t[t-if='isEventDeletable']" position="after">
+            <a href="#" class="btn btn-info o_cw_popover_custom_action" t-on-click="onCustomAction">Custom Action</a>
+        </xpath>
+    </template>
+</odoo>

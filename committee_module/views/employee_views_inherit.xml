@@ -350,6 +350,25 @@
             </field>
         </record>
 
+        <record id="committee_module.view_kanban_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.kanban.inherit.evaluations</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr.hr_department_view_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[hasclass('o_kanban_primary_right')]" position="replace">
+                    <div groups="hr_appraisal.group_hr_appraisal_user"
+                         t-if="record.appraisals_to_process_count.raw_value &gt; 0" class="row ml16">
+                        <div class="col">
+                            <a name="476" type="action">
+                                <t t-esc="record.appraisals_to_process_count.raw_value"/>
+                                Evaluations
+                            </a>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+
 
     </data>
 </odoo>

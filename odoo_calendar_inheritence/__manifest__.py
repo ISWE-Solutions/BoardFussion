@@ -30,11 +30,11 @@ Long description of module's purpose
                 'qxm_product_pdf_annotation_tool',
                 'knowledge',
                 'website_sale',
-                "appointment"
+                "appointment",
+                "web"
                 ],
 
     # always loaded
-
 
     'data': [
         'security/res_groups.xml',
@@ -45,15 +45,16 @@ Long description of module's purpose
         'data/knowledge_article_sequence.xml',
         # 'data/products_cron.xml',
         'views/calendar_event_product_line_view.xml',
+        'views/attendees_lines_view.xml',
         'views/views.xml',
         'views/templates.xml',
         # 'views/pdf_merger_server_action.xml',
         'views/product_document_views.xml',
+        'views/custom_calendar_view.xml',
         'views/knowledge_article_views.xml',
         'views/project_task_view.xml',
         'views/calender_event_view.xml',
         'views/appointments_view.xml',
-        'views/attendees_lines_view.xml',
         # 'views/employee.xml',
     ],
 
@@ -62,4 +63,3 @@ Long description of module's purpose
         'demo/demo.xml',
     ],
 }
-

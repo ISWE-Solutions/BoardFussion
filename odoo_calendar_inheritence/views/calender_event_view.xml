@@ -33,5 +33,55 @@
             <field name="numbercall">-1</field>
             <field name="active">1</field>
         </record>
+
+        <record id="view_calendar_event_form_quick_create_inherit" model="ir.ui.view">
+            <field name="name">calendar.event.form.quick_create.inherit</field>
+            <field name="model">calendar.event</field>
+            <field name="inherit_id" ref="calendar.view_calendar_event_form_quick_create"/>
+            <field name="arch" type="xml">
+                <!-- Make 'Add title' required -->
+                <xpath expr="//h1/field[@name='name']" position="attributes">
+                    <attribute name="required">1</attribute>
+                </xpath>
+
+                <!-- Change the button text from 'Odoo meeting' to 'Board Fusion meeting' -->
+                <xpath expr="//button[@name='set_discuss_videocall_location']/span[2]" position="replace">
+                    <span>Board Fusion meeting</span>
+                </xpath>
+            </field>
+        </record>
+
+
+        <record id="view_calendar_event_form_inherit" model="ir.ui.view">
+            <field name="name">calendar.event.form.inherit</field>
+            <field name="model">calendar.event</field>
+            <field name="inherit_id" ref="calendar.view_calendar_event_form"/>
+            <field name="arch" type="xml">
+                <!-- Change the button text from 'Odoo meeting' to 'Board Fusion meeting' -->
+                <xpath expr="//button[@name='set_discuss_videocall_location']/span[2]" position="replace">
+                    <span>Board Fusion meeting</span>
+                </xpath>
+            </field>
+        </record>
+
+<!--        <record id="view_calendar_event_calendar_inherit" model="ir.ui.view">-->
+<!--            <field name="name">calendar.event.calendar.inherit</field>-->
+<!--            <field name="model">calendar.event</field>-->
+<!--            <field name="inherit_id" ref="calendar.view_calendar_event_calendar"/>-->
+<!--            <field name="arch" type="xml">-->
+<!--                &lt;!&ndash; Ensure that clicking on the calendar opens the full form view &ndash;&gt;-->
+<!--                <xpath expr="//calendar" position="attributes">-->
+<!--                    <attribute name="quick_create">false</attribute>-->
+<!--                    <attribute name="event_open_popup">false</attribute>-->
+<!--                </xpath>-->
+<!--            </field>-->
+<!--        </record>-->
+
+<!--        <template id="custom_calendar_popover_footer" inherit_id="web.CalendarCommonPopover.footer">-->
+<!--            <xpath expr="//a[contains(@class, 'o_cw_popover_edit')]" position="replace">-->
+<!--                <a href="#" class="btn btn-primary o_cw_popover_edit" t-on-click="onEditEvent">More options</a>-->
+<!--            </xpath>-->
+<!--        </template>-->
+
     </data>
 </odoo>
