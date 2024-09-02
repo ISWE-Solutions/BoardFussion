@@ -5,7 +5,7 @@ import io
 from markupsafe import Markup
 from odoo.tools.safe_eval import safe_eval
 from odoo.tools import html_escape
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 
 
 class ProductDocument(models.Model):
@@ -18,6 +18,20 @@ class ProductDocument(models.Model):
     user_ids = fields.Many2many('res.users')
     partner_ids = fields.Many2many('res.partner')
     ir_attachment_custom_id = fields.Many2one('ir.attachment')
+    mime_type = fields.Char(related='ir_attachment_id.mimetype')
+    is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
+
+    @api.depends('ir_attachment_id')
+    def _compute_is_pdf_document(self):
+        for rec in self:
+            if rec.ir_attachment_id:
+                if rec.ir_attachment_id.mimetype == 'application/pdf':
+                    rec.is_pdf = True
+                else:
+                    rec.is_pdf = False
+            else:
+                raise UserError(_('No attachment found!'))
+
 
     def merge_selected_pdfs(self):
         # print('Starting PDF merge process')

@@ -79,9 +79,9 @@
         <field name="model">calendar.event</field>
         <field name="inherit_id" ref="calendar.view_calendar_event_form"/>
         <field name="arch" type="xml">
-            <!--            <xpath expr="//field[@name='description']" position="after">-->
-            <!--                <field name="product_id"/>-->
-            <!--            </xpath>-->
+            <xpath expr="//field[@name='description']" position="after">
+                <field name="product_id" invisible="1"/>
+            </xpath>
 
             <xpath expr="//div[@name='button_box']" position="inside">
                 <field name="company_id" invisible="1"/>
@@ -121,24 +121,33 @@
             <!--                <attribute name="invisible">1</attribute>-->
             <!--            </xpath>            -->
 
+            <xpath expr="//field[@name='show_as']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='privacy']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+
             <xpath expr="//page[@name='page_invitations']" position="replace">
-                <page name="page_invitations" string="Invitations">
-<!--                    <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"-->
-<!--                            class="oe_link"/>-->
+                <page name="page_invitations" string="Invitations" invisible="not product_id">
+                    <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
+                            class="oe_link"/>
                     <field name="attendee_ids" widget="one2many" mode="tree" readonly="1">
                         <tree string="Invitation details" editable="top" create="false" delete="false">
                             <field name="partner_id"/>
                             <field name="email" widget="email"/>
                             <field name="phone" widget="phone"/>
                             <field name="state"/>
-<!--                            <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')"-->
-<!--                                    string="Uncertain" type="object" icon="fa-asterisk"/>-->
-<!--                            <button name="do_accept" string="Accept"-->
-<!--                                    invisible="state not in ('needsAction', 'tentative', 'declined')" type="object"-->
-<!--                                    icon="fa-check text-success"/>-->
-<!--                            <button name="do_decline" string="Decline"-->
-<!--                                    invisible="state not in ('needsAction', 'tentative', 'accepted')" type="object"-->
-<!--                                    icon="fa-times-circle text-danger"/>-->
+                            <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')"
+                                    string="Uncertain" type="object" icon="fa-asterisk"/>
+                            <button name="do_accept" string="Accept"
+                                    invisible="state not in ('needsAction', 'tentative', 'declined')" type="object"
+                                    icon="fa-check text-success"/>
+                            <button name="do_decline" string="Decline"
+                                    invisible="state not in ('needsAction', 'tentative', 'accepted')" type="object"
+                                    icon="fa-times-circle text-danger"/>
                         </tree>
                         <kanban class="o_kanban_mobile" create="false" delete="false">
                             <field name="partner_id"/>
@@ -174,7 +183,7 @@
                 </page>
             </xpath>
             <xpath expr="//page[@name='page_invitations']" position="after">
-                <page name="agenda" string="Meeting Agenda">
+                <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
                         <tree>
@@ -209,7 +218,7 @@
                                 confirm="Do you want to update the board pack?"/>
                     </div>
                 </page>
-                <page name="minutes_of_meeting" string="Minutes of Meetings">
+                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_description_created" invisible="1"/>

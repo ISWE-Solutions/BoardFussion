@@ -2,12 +2,12 @@ from odoo import models, fields, api
 
 
 
-# class SurveyEmployees(models.Model):
-#     _inherit = "survey.survey"
-#
-#     survey_type = fields.Selection(selection_add=[
-#         ('compliance', 'Compliance'),
-#     ], string="Survey Type", ondelete={'compliance': 'cascade'})
+class SurveyEmployees(models.Model):
+    _inherit = "survey.survey"
+
+    survey_type = fields.Selection(selection_add=[
+        ('compliance', 'Compliance'),
+    ], string="Survey Type", ondelete={'compliance': 'cascade'})
 
 
 class Department(models.Model):
