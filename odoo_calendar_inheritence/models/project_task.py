@@ -63,3 +63,52 @@ class CalanderMeeting(models.Model):
         meeting = self.env['calendar.event'].create(vals)
         if meeting:
             self.calendar_id = meeting.id
+
+
+class CalendarEvent(models.Model):
+    _inherit = 'calendar.event'
+
+    def unlink(self):
+        for event in self:
+            # Delete the related project with the same name as the calendar event
+            related_project = self.env['project.project'].search([('name', '=', event.name)], limit=1)
+            if related_project:
+                print(f"Found related project: {related_project.name}")
+                related_project.unlink()
+            else:
+                print(f"No related project found for event: {event.name}")
+
+            # Find the "Projects" workspace (folder)
+            project_workspace = self.env['documents.folder'].search([('name', '=', 'Projects')], limit=1)
+            if project_workspace:
+                print(f"Found project workspace: {project_workspace.name}")
+
+                # Search for the related document with the same name as the calendar event in the "Projects" workspace
+                related_document = self.env['documents.document'].search([
+                    ('name', '=', event.name),
+                    ('folder_id', '=', project_workspace.id)
+                ], limit=1)
+
+                if related_document:
+                    print(f"Found related document: {related_document.name}")
+                    related_document.unlink()
+                else:
+                    print(f"No related document found for event: {event.name} in the Projects workspace")
+
+                # Search for the folder within the "Projects" workspace that matches the event name
+                related_folder = self.env['documents.folder'].search([
+                    ('name', '=', event.name),
+                    # ('parent_id', '=', project_workspace.id)
+                ], limit=1)
+
+                if related_folder:
+                    print(f"Found related folder: {related_folder.name}")
+                    related_folder.unlink()
+                else:
+                    print(f"No related folder found for event: {event.name} in the Projects workspace")
+            else:
+                print("No 'Projects' workspace found")
+
+        # Proceed with the deletion of the calendar event
+        return super(CalendarEvent, self).unlink()
+

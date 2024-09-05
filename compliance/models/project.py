@@ -15,6 +15,8 @@ class ProjectProject(models.Model):
         return self.create(values)
 
 
+
+
 class ProjectTask(models.Model):
     _inherit = 'project.task'
 

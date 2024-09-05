@@ -34,6 +34,7 @@
             <field name="active">1</field>
         </record>
 
+
         <record id="view_calendar_event_form_quick_create_inherit" model="ir.ui.view">
             <field name="name">calendar.event.form.quick_create.inherit</field>
             <field name="model">calendar.event</field>
@@ -77,11 +78,36 @@
             </field>
         </record>
 
-<!--        <template id="custom_calendar_popover_footer" inherit_id="web.CalendarCommonPopover.footer">-->
-<!--            <xpath expr="//a[contains(@class, 'o_cw_popover_edit')]" position="replace">-->
-<!--                <a href="#" class="btn btn-primary o_cw_popover_edit" t-on-click="onEditEvent">More options</a>-->
-<!--            </xpath>-->
-<!--        </template>-->
+        <!--        <template id="custom_calendar_popover_footer" inherit_id="web.CalendarCommonPopover.footer">-->
+        <!--            <xpath expr="//a[contains(@class, 'o_cw_popover_edit')]" position="replace">-->
+        <!--                <a href="#" class="btn btn-primary o_cw_popover_edit" t-on-click="onEditEvent">More options</a>-->
+        <!--            </xpath>-->
+        <!--        </template>-->
+
+        <record id="view_calendar_event_tree_custom" model="ir.ui.view">
+            <field name="name">calendar.event.tree.custom</field>
+            <field name="model">calendar.event</field>
+            <field name="inherit_id" ref="calendar.view_calendar_event_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='appointment_type_id']" position="attributes">
+                    <attribute name="column_invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='appointment_resource_ids']" position="attributes">
+                    <attribute name="column_invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='partner_ids']" position="attributes">
+                    <attribute name="string">Invitees</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="project.menu_projects" model="ir.ui.menu">
+            <field name="name">Action Points</field>
+        </record>
+
+        <record id="appointment.appointment_menu_calendar" model="ir.ui.menu">
+            <field name="active">False</field>
+        </record>
 
     </data>
 </odoo>

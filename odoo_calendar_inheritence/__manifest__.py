@@ -45,6 +45,7 @@ Long description of module's purpose
         'data/knowledge_article_sequence.xml',
         # 'data/products_cron.xml',
         'views/calendar_event_product_line_view.xml',
+        'views/attendees_lines_view.xml',
         'views/views.xml',
         'views/templates.xml',
         # 'views/pdf_merger_server_action.xml',
@@ -53,10 +54,17 @@ Long description of module's purpose
         'views/project_task_view.xml',
         'views/calender_event_view.xml',
         'views/appointments_view.xml',
-        'views/attendees_lines_view.xml',
         # 'views/employee.xml',
     ],
 
+    'qweb': [
+        'static/src/xml/custom_confirm.xml',
+    ],
+    'assets': {
+        'web.assets_backend': [
+            'odoo_calendar_inheritence/static/src/js/custom_confirm.js',
+        ],
+    },
     # only loaded in demonstration mode
     'demo': [
         'demo/demo.xml',

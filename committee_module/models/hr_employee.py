@@ -15,7 +15,7 @@ class HrEmployee(models.Model):
         ('trainee', 'Trainee'),
         ('contractor', 'Contractor'),
         ('freelance', 'Freelancer'),
-    ], string='Employee Type', default='member', required=True, groups="hr.group_hr_user",
+    ], string='Member Type', default='employee', required=True, groups="hr.group_hr_user",
         help="The member type. Although the primary purpose may seem to categorize members, this field has also an impact in the Contract History. Only Member type is supposed to be under contract and will have a Contract History.")
 
     member_type = fields.Selection([
