@@ -10,8 +10,9 @@
                         <group>
                             <field name="description" required="True" placeholder="Agenda Item"/>
                             <field name="presenter_id" widget="many2many_tags" options="{'no_create': True}"
-                                   placeholder="Presenters"/>
-                            <field name="pdf_attachment" widget="many2many_binary"/>
+                                   placeholder="Presenters!"/>
+                            <field name="pdf_attachment" widget="many2many_binary"
+                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                         </group>
                     </group>
                 </sheet>

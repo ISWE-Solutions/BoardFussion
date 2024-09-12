@@ -25,25 +25,25 @@ class CalendarEventProductLine(models.Model):
     @api.model_create_multi
     def create(self, values):
         rtn = super(CalendarEventProductLine, self).create(values)
+        document_model = self.env['product.document']
         for record in rtn:
             record.product_id = record.calendar_id.product_id.id
             product = record.product_id
-        document_model = self.env['product.document']
-        if record.pdf_attachment:
-            for attachment in record.pdf_attachment:
-                # merged_pdf_content = base64.b64encode(attachment.datas.read())
-                attachment_data = attachment.datas
-                # attachment_bytes = base64.b64encode(attachment_data)
-                new_document = document_model.sudo().create(
-                    {
-                        'res_model': 'product.template',
-                        'name':attachment.name,
-                        'res_id':product.id,
-                        'ir_attachment_id': attachment.id,
-                        # 'user_ids':[(6, 0, self.env.user.id)],
-                    }
-                )
-            record.calendar_id.compute_visible_users()
+            if record.pdf_attachment:
+                for attachment in record.pdf_attachment:
+                    # merged_pdf_content = base64.b64encode(attachment.datas.read())
+                    attachment_data = attachment.datas
+                    # attachment_bytes = base64.b64encode(attachment_data)
+                    new_document = document_model.sudo().create(
+                        {
+                            'res_model': 'product.template',
+                            'name':attachment.name,
+                            'res_id':product.id,
+                            'ir_attachment_id': attachment.id,
+                            # 'user_ids':[(6, 0, self.env.user.id)],
+                        }
+                    )
+                record.calendar_id.compute_visible_users()
         return rtn
 
     def write(self, values):
@@ -93,6 +93,7 @@ class CalendarEventProductLine(models.Model):
         res=super(CalendarEventProductLine, self).write(values)
         # print(res)
         return res
+
 
     def unlink(self):
         unlink_list_ids=[]

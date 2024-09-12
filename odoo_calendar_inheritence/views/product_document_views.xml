@@ -61,6 +61,9 @@
                 <xpath expr="//form//sheet//group[5]" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </xpath>
+                <xpath expr="//field[@name='type']" position="after">
+                    <field name="mime_type"/>
+                </xpath>
             </field>
         </record>
 
@@ -70,18 +73,23 @@
             <field name="model">product.document</field>
             <field name="inherit_id" ref="sale.product_document_kanban"/>
             <field name="arch" type="xml">
+                <xpath expr="//div[@name='bottom']" position="before">
+                    <field name="is_pdf" invisible="1"/>
+                </xpath>
                 <xpath expr="//div[@name='bottom']" position="replace">
                     <div>
                         <button name="action_open_pdf_annotation" class="btn btn-primary" id="open_pdf_annotation"
                                 string="Add Annotations"
-                                type="object"/>
+                                type="object"
+                                invisible="not is_pdf"/>
                     </div>
                 </xpath>
 
                 <xpath expr="//button[@name='action_open_pdf_annotation']" position="after">
                     <button name="action_view_pdf_annotation" class="btn btn-danger mt-2" id="preview_pdf_annotation"
                             string="Preview Annotations"
-                            type="object"/>
+                            type="object"
+                            invisible="not is_pdf"/>
                 </xpath>
             </field>
         </record>

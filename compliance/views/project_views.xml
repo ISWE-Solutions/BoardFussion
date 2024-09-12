@@ -19,6 +19,10 @@
                            placeholder="e.g. Example Action Point" invisible="is_compliance"/>
                 </xpath>
 
+                <xpath expr="//div/h1/field[@name='name']" position="after">
+                    <field name="project_progress" widget="progressbar"/>
+                </xpath>
+
                 <xpath expr="//notebook/page/field[@name='description']" position="replace">
                     <field name="description" options="{'resizable': false}" placeholder="Action Point description..."
                            invisible="is_compliance"/>
@@ -28,5 +32,49 @@
                 </xpath>
             </field>
         </record>
+
+        <record id="inherit_view_project_kanban" model="ir.ui.view">
+            <field name="name">project.project.kanban.inherit</field>
+            <field name="model">project.project</field>
+            <field name="inherit_id" ref="project.view_project_kanban"/> <!-- Use the correct module name -->
+            <field name="arch" type="xml">
+                <!-- Inherit and modify the kanban view -->
+                <kanban position="attributes">
+                    <attribute name="on_create"/>
+                    <attribute name="quick_create_view"/>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="view_project_kanban_inherit" model="ir.ui.view">
+            <field name="name">project.project.kanban.inherit.gauge</field>
+            <field name="model">project.project</field>
+            <field name="inherit_id" ref="project.view_project_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='open_task_count']" position="before">
+                    <div t-if="record.project_progress.raw_value">
+                        <div style="text-align: center;">
+                            <field name="project_progress" widget="gauge"
+                                   options="{'max_field': '100', 'style': 'width:160px; height:120px;'}"/>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+
+
+        <!--        <record id="view_project_kanban_inherit_progress" model="ir.ui.view">-->
+        <!--            <field name="name">project.project.kanban.inherit.progress</field>-->
+        <!--            <field name="model">project.project</field>-->
+        <!--            <field name="inherit_id" ref="project.view_project_config_kanban"/>-->
+        <!--            <field name="arch" type="xml">-->
+        <!--                <xpath expr="//div[@class='oe_kanban_content']" position="inside">-->
+        <!--                    &lt;!&ndash; Display the gauge widget for project progress &ndash;&gt;-->
+        <!--                    <field name="project_progress" widget="gauge"-->
+        <!--                           options="{'max_field': 'max_rate', 'min': 0, 'max': 100}"-->
+        <!--                           class="oe_kanban_gauge" style="width:160px; height:120px;"/>-->
+        <!--                </xpath>-->
+        <!--            </field>-->
+        <!--        </record>-->
     </data>
 </odoo>

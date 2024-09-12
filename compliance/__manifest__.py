@@ -22,12 +22,13 @@ Long description of module's purpose
 
     # always loaded
     'data': [
-        # 'security/ir.model.access.csv',
+        'security/ir.model.access.csv',
         'views/views.xml',
         'views/templates.xml',
         'views/project_task_view.xml',
         'views/project_views.xml',
         'views/compliance_project_views.xml',
+        'views/task_checklist_view.xml',
         'views/project_actions.xml',
         'views/project_menu.xml',
 

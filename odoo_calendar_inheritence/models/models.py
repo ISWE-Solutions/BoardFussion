@@ -96,6 +96,14 @@ class OdooCalendarInheritence(models.Model):
     is_description_created = fields.Boolean(default=False)
     document_count = fields.Integer(compute='_compute_document_count')
 
+    # visibility
+    privacy = fields.Selection(
+        [('public', 'Public'),
+         ('private', 'Private'),
+         ('confidential', 'Only internal users')],
+        'Privacy', default='private', required=True,
+        help="People to whom this event will be visible.")
+
     @api.depends('product_line_ids')
     def _compute_agenda_count(self):
         for rec in self:
@@ -132,6 +140,7 @@ class OdooCalendarInheritence(models.Model):
 
     @api.model_create_multi
     def create(self, values):
+        print("MAIN CREATE")
         # for value in values:
         #     if not value.get('name') or value['name'] == _('new'):
         #

@@ -271,48 +271,48 @@
         <!--        </record>-->
 
 
-        <record id="hr_contract_view_form_inherit" model="ir.ui.view">
-            <field name="name">hr.contract.form.inherit</field>
-            <field name="model">hr.contract</field>
-            <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
-            <field name="arch" type="xml">
+<!--        <record id="hr_contract_view_form_inherit" model="ir.ui.view">-->
+<!--            <field name="name">hr.contract.form.inherit</field>-->
+<!--            <field name="model">hr.contract</field>-->
+<!--            <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>-->
+<!--            <field name="arch" type="xml">-->
 
-                <!--                <xpath expr="//field[@name='name']" position="attributes">-->
-                <!--                    <attribute name="placeholder">Tenure Reference</attribute>-->
-                <!--                </xpath>-->
+<!--                <xpath expr="//field[@name='name']" position="attributes">-->
+<!--                    <attribute name="placeholder">Tenure Reference</attribute>-->
+<!--                </xpath>-->
 
-                <!--                <xpath expr="//field[@name='date_start']" position="attributes">-->
-                <!--                    <attribute name="string">Tenure Start Date</attribute>-->
-                <!--                </xpath>-->
+<!--                <xpath expr="//field[@name='date_start']" position="attributes">-->
+<!--                    <attribute name="string">Tenure Start Date</attribute>-->
+<!--                </xpath>-->
 
-                <!--                <xpath expr="//field[@name='date_end']" position="attributes">-->
-                <!--                    <attribute name="string">Tenure End Date</attribute>-->
-                <!--                </xpath>-->
+<!--                <xpath expr="//field[@name='date_end']" position="attributes">-->
+<!--                    <attribute name="string">Tenure End Date</attribute>-->
+<!--                </xpath>-->
 
-                <xpath expr="//button[@name='action_open_contract_list']" position="attributes">
-                    <attribute name="invisible">contracts_count == 0</attribute>
-                </xpath>
-                <!--                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count == 1']"-->
-                <!--                       position="attributes">-->
-                <!--                    <attribute name="t">Tenures</attribute>-->
-                <!--                </xpath>-->
-                <!--                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count &gt; 1']"-->
-                <!--                       position="attributes">-->
-                <!--                    <attribute name="t">Tenure</attribute>-->
-                <!--                </xpath>-->
+<!--                <xpath expr="//button[@name='action_open_contract_list']" position="attributes">-->
+<!--                    <attribute name="invisible">contracts_count == 0</attribute>-->
+<!--                </xpath>-->
+<!--                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count == 1']"-->
+<!--                       position="attributes">-->
+<!--                    <attribute name="t">Tenures</attribute>-->
+<!--                </xpath>-->
+<!--                <xpath expr="//button[@name='action_open_contract_list']/div/span[@class='o_stat_text'][@invisible='contracts_count &gt; 1']"-->
+<!--                       position="attributes">-->
+<!--                    <attribute name="t">Tenure</attribute>-->
+<!--                </xpath>-->
 
-                <!--                <xpath expr="//page[@name='information']" position="attributes">-->
-                <!--                    <attribute name="string">Tenure Information</attribute>-->
-                <!--                </xpath>-->
-                <!--                <xpath expr="//page[@name='other']" position="attributes">-->
-                <!--                    <attribute name="string">Tenure Details</attribute>-->
-                <!--                </xpath>-->
+<!--                <xpath expr="//page[@name='information']" position="attributes">-->
+<!--                    <attribute name="string">Tenure Information</attribute>-->
+<!--                </xpath>-->
+<!--                <xpath expr="//page[@name='other']" position="attributes">-->
+<!--                    <attribute name="string">Tenure Details</attribute>-->
+<!--                </xpath>-->
 
-                <!--                <xpath expr="//group[@name='notes_group']/field[@name='notes']" position="attributes">-->
-                <!--                    <attribute name="placeholder">Type in notes about this tenure...</attribute>-->
-                <!--                </xpath>-->
-            </field>
-        </record>
+<!--                <xpath expr="//group[@name='notes_group']/field[@name='notes']" position="attributes">-->
+<!--                    <attribute name="placeholder">Type in notes about this tenure...</attribute>-->
+<!--                </xpath>-->
+<!--            </field>-->
+<!--        </record>-->
 
         <!--        <record id="hr_employee_view_form_inherit_org_chart_update" model="ir.ui.view">-->
         <!--            <field name="name">hr.employee.view.form.inherit.org_chart.update</field>-->
@@ -349,6 +349,27 @@
                 </xpath>
             </field>
         </record>
+
+        <record id="committee_module.view_kanban_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.kanban.inherit.evaluations</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr.hr_department_view_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[hasclass('o_kanban_primary_right')]" position="replace">
+                    <div groups="hr_appraisal.group_hr_appraisal_user"
+                         t-if="record.appraisals_to_process_count.raw_value &gt; 0" class="row ml16">
+                        <div class="col">
+                            <a name="476" type="action">
+                                <t t-esc="record.appraisals_to_process_count.raw_value"/>
+                                Evaluations
+                            </a>
+                        </div>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+
+
 
 
     </data>

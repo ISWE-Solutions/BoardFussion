@@ -37,31 +37,31 @@
             </field>
         </record>
 
-<!--        <record id="act_member_from_committees" model="ir.actions.act_window">-->
-<!--            <field name="name">Members</field>-->
-<!--            <field name="res_model">hr.employee</field>-->
-<!--            <field name="view_mode">tree,kanban,form</field>-->
-<!--            <field name="search_view_id" ref="view_employee_filter"/>-->
-<!--            <field name="context">{-->
-<!--                "searchpanel_default_committees_ids": active_id,-->
-<!--                "default_committees_ids": active_id,-->
-<!--                "search_default_group_department": 1,-->
-<!--                "search_default_committees_ids": active_id,-->
-<!--                "expand": 1}-->
-<!--            </field>-->
-<!--            <field name="help" type="html">-->
-<!--                <p class="o_view_nocontent_smiling_face">-->
-<!--                    Add a new member-->
-<!--                </p>-->
-<!--                <p>-->
-<!--                    With just a quick glance on the Odoo member screen, you-->
-<!--                    can easily find all the information you need for each person;-->
-<!--                    contact data, job position, availability, etc.-->
-<!--                </p>-->
-<!--            </field>-->
-<!--        </record>-->
-<!--        #Removes Group Create From Kanban Showing +Department-->
-         <record id="hr_kanban_inherited" model="ir.ui.view">
+        <!--        <record id="act_member_from_committees" model="ir.actions.act_window">-->
+        <!--            <field name="name">Members</field>-->
+        <!--            <field name="res_model">hr.employee</field>-->
+        <!--            <field name="view_mode">tree,kanban,form</field>-->
+        <!--            <field name="search_view_id" ref="view_employee_filter"/>-->
+        <!--            <field name="context">{-->
+        <!--                "searchpanel_default_committees_ids": active_id,-->
+        <!--                "default_committees_ids": active_id,-->
+        <!--                "search_default_group_department": 1,-->
+        <!--                "search_default_committees_ids": active_id,-->
+        <!--                "expand": 1}-->
+        <!--            </field>-->
+        <!--            <field name="help" type="html">-->
+        <!--                <p class="o_view_nocontent_smiling_face">-->
+        <!--                    Add a new member-->
+        <!--                </p>-->
+        <!--                <p>-->
+        <!--                    With just a quick glance on the Odoo member screen, you-->
+        <!--                    can easily find all the information you need for each person;-->
+        <!--                    contact data, job position, availability, etc.-->
+        <!--                </p>-->
+        <!--            </field>-->
+        <!--        </record>-->
+        <!--        #Removes Group Create From Kanban Showing +Department-->
+        <record id="hr_kanban_inherited" model="ir.ui.view">
             <field name="name">hr_kanban_inherited</field>
             <field name="model">hr.employee</field>
             <field name="inherit_id" ref="hr.hr_kanban_view_employees"/>
@@ -71,7 +71,7 @@
 
                 </xpath>
             </field>
-         </record>
+        </record>
 
 
         <record id="hr_department_kanban_inherited" model="ir.ui.view">
@@ -192,6 +192,96 @@
                 </xpath>
             </field>
         </record>
+
+
+        <!--        &lt;!&ndash; Inherit the original applicant_hired_template to create a new template for member creation &ndash;&gt;-->
+        <!--        <template id="member_created_template" inherit_id="applicant_hired_template">-->
+        <!--            <xpath expr="//t[text()='Employee created:']" position="replace">-->
+        <!--                Member created:-->
+        <!--                <a href="#" t-att-data-oe-id="member.id" data-oe-model="your.member.model">-->
+        <!--                    <t t-esc="member.name"/>-->
+        <!--                </a>-->
+        <!--            </xpath>-->
+        <!--        </template>-->
+
+        <!--        &lt;!&ndash; Modify the mail notification template to adjust the background color &ndash;&gt;-->
+        <!--        <template id="mail_notification_light_without_background" inherit_id="mail.mail_notification_light">-->
+        <!--            <xpath expr="//t//table[@role='presentation']" position="attributes">-->
+        <!--                <attribute name="style" add="background-color: white;" separator=" "/>-->
+        <!--            </xpath>-->
+        <!--        </template>-->
+
+        <record id="view_partner_form_inherit_hide_sales_purchases" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.sales.purchases</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <!-- Hide the Sales & Purchase page -->
+                <xpath expr="//page[@name='sales_purchases']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit_hide_invoicing" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.invoicing</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[@name='accounting']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit_hide_employee_button" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.employee.button</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="hr.res_partner_view_form"/>
+            <field name="arch" type="xml">
+                <!-- Hide the Employee button -->
+                <xpath expr="//button[@name='action_open_employees']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit_hide_sales_button" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.sales.button</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="sale.res_partner_view_buttons"/>
+            <field name="arch" type="xml">
+                <!-- Hide the Sales button -->
+                <xpath expr="//button[@name='action_view_sale_order']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit_hide_invoice_button" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.invoice.button</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="account.partner_view_buttons"/>
+            <field name="arch" type="xml">
+                <!-- Hide the Sales button -->
+                <xpath expr="//button[@name='action_view_partner_invoices']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_partner_form_inherit_hide_web_button" model="ir.ui.view">
+            <field name="name">view.partner.form.inherit.hide.web.button</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="website_partner.view_partners_form_website"/>
+            <field name="arch" type="xml">
+                <!-- Hide the Sales button -->
+                <xpath expr="//field[@name='is_published']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>
+
 
     </data>
 </odoo>
