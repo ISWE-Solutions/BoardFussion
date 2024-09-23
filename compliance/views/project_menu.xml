@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
     <menuitem id="menu_compliance_root" name="Compliance" parent="project.menu_main_pm" action="action_compliance_projects" sequence="1"/>
-    <menuitem id="menu_compliance_root" name="Tutu" parent="project.menu_main_pm" sequence="1" active="False"/>
 <!--    <menuitem id="menu_compliance_projects" name="Compliance Projects" parent="menu_compliance_root"-->
 <!--              action="action_compliance_projects" sequence="1"/>-->
 

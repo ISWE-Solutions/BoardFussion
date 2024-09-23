@@ -95,6 +95,7 @@ class OdooCalendarInheritence(models.Model):
     is_meeting_finished = fields.Boolean(default=False)
     is_description_created = fields.Boolean(default=False)
     document_count = fields.Integer(compute='_compute_document_count')
+    agenda_ids = fields.One2many('agenda.lines', 'calendar_id', string='Agenda Items')
 
     # visibility
     privacy = fields.Selection(
@@ -497,7 +498,6 @@ class OdooCalendarInheritence(models.Model):
     #     }
     #     self.article_id.sudo().write(article_values)
 
-
     def action_create_agenda_descriptions(self):
         company_id = self.env.company
         # Get the company logo
@@ -635,13 +635,26 @@ class OdooCalendarInheritence(models.Model):
 
     # -------------------------------------------------------------------
     # -------------------------------------------------------------------
+    #
+    # @api.depends('product_line_ids')
+    # def _compute_product_documents(self):
+    #     for event in self:
+    #         product_ids = event.product_line_ids.mapped('product_id')
+    #         documents = self.env['product.document'].search([('product_id', 'in', product_ids.ids)])
+    #         event.product_document_ids = [5, 0, [documents.ids]]
 
     @api.depends('product_line_ids')
     def _compute_product_documents(self):
         for event in self:
             product_ids = event.product_line_ids.mapped('product_id')
-            documents = self.env['product.document'].search([('product_id', 'in', product_ids.ids)])
-            event.product_document_ids = [5, 0, [documents.ids]]
+            print(f"Computing product documents for event {event.id}, product_ids: {product_ids.ids}")
+            if product_ids:
+                documents = self.env['product.document'].search([('product_id', 'in', product_ids.ids)])
+                print(f"Found documents: {documents.ids} for product_ids: {product_ids.ids}")
+                event.product_document_ids = [(6, 0, documents.ids)]
+            else:
+                event.product_document_ids = [(5,)]  # Clear if no products
+                print(f"No products found for event {event.id}, clearing documents.")
 
     @api.onchange('new_project_id')
     def _onchange_new_project_id(self):
@@ -744,6 +757,7 @@ class OdooCalendarInheritence(models.Model):
         documents = self.env['product.document'].sudo().search(domain)
         # print(documents)
         self.document_count = len(documents)
+
     def action_open_documents(self):
         # self.ensure_one()
         company_id = self.env.company.id
@@ -797,8 +811,8 @@ class OdooCalendarInheritence(models.Model):
                         <br/>
                     </p>
                 """ % (
-                    _("Upload Pdfs to your agenda"),
-                    _("Use this feature to store pdfs you would like to share with your members"),
+                    _("Upload Documents to your agenda"),
+                    _("Use this feature to store Documents you would like to share with your members"),
                 )
             }
 
@@ -850,14 +864,71 @@ class OdooCalendarInheritence(models.Model):
                         'partner_ids': [(6, 0, record.partner_ids.ids)]
                     }
                 )
+
     def action_agenda_inv_sendmail(self):
         email = self.env.user.email
         if email:
             for meeting in self:
                 meeting.attendee_ids._send_custom_mail_to_attendees(
-                    self.env.ref('odoo_calendar_inheritence.calendar_template_agenda_meeting_invitation', raise_if_not_found=False)
+                    self.env.ref('odoo_calendar_inheritence.calendar_template_agenda_meeting_invitation',
+                                 raise_if_not_found=False)
                 )
         return True
+
+    # def unlink(self):
+    #     # Raise a warning before deletion
+    #     for event in self:
+    #         message = _(
+    #             "Action points, documents, agenda, and minutes will be permanently deleted. Are you sure you want to continue?")
+    #         raise UserError(message)
+    #
+    #     # If confirmed, perform the standard deletion
+    #     return super(OdooCalendarInheritence, self).unlink()
+
+    def copy(self, default=None):
+        default = dict(default or {})
+
+        # Append "(copy)" to the event name
+        if 'name' not in default:
+            default['name'] = f"{self.name} (copy)"
+
+        print(f"Starting to copy calendar event: {self.id}")
+
+        # Ensure related product lines are copied
+        if self.product_line_ids:
+            new_product_lines = []
+            for line in self.product_line_ids:
+                # Duplicate each line and append to new_product_lines
+                new_line = line.copy()
+                new_product_lines.append((4, new_line.id))  # (4, ID) to link new record
+                print(f"Copied product line: {line.id} -> {new_line.id}")
+
+            default['product_line_ids'] = new_product_lines
+
+        # Ensure related agenda items are copied
+        if self.agenda_lines_ids:
+            print(f"Agenda lines found for event {self.id}: {[agenda.id for agenda in self.agenda_lines_ids]}")
+            new_agenda_lines = []
+            for agenda_item in self.agenda_lines_ids:
+                # Duplicate each agenda item without calendar_id
+                new_agenda_item = agenda_item.copy(default={'calendar_id': False})
+                new_agenda_lines.append((4, new_agenda_item.id))  # (4, ID) to link new record
+
+                # Link existing attachments directly without duplicating
+                existing_attachments = [(4, attachment.id) for attachment in agenda_item.agenda_attachment_ids]
+                new_agenda_item.write({
+                    'agenda_attachment_ids': existing_attachments  # Link existing attachments
+                })
+                print(f"Copied agenda item: {agenda_item.id} -> {new_agenda_item.id}")
+
+            default['agenda_lines_ids'] = new_agenda_lines
+        else:
+            print(f"No agenda lines found for event {self.id}.")
+
+        # Perform standard duplication
+        print("Performing standard duplication...")
+        return super(OdooCalendarInheritence, self).copy(default)
+
 
 class AgendaLines(models.Model):
     _name = 'agenda.lines'

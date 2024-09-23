@@ -6,7 +6,7 @@ class SurveyEmployees(models.Model):
     _inherit = "survey.survey"
 
     survey_type = fields.Selection(selection_add=[
-        ('compliance', 'Compliance'),
+        ('compliance', 'Voting'),
     ], string="Survey Type", ondelete={'compliance': 'cascade'})
 
 
@@ -27,4 +27,7 @@ class Department(models.Model):
             count_total_employee = 0
         for department in self:
             department.total_employee = result.get(department.id, 0)
+
+
+
 

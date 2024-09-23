@@ -31,16 +31,13 @@ class CalendarEventProductLine(models.Model):
             product = record.product_id
             if record.pdf_attachment:
                 for attachment in record.pdf_attachment:
-                    # merged_pdf_content = base64.b64encode(attachment.datas.read())
                     attachment_data = attachment.datas
-                    # attachment_bytes = base64.b64encode(attachment_data)
                     new_document = document_model.sudo().create(
                         {
                             'res_model': 'product.template',
-                            'name':attachment.name,
-                            'res_id':product.id,
+                            'name': attachment.name,
+                            'res_id': product.id,
                             'ir_attachment_id': attachment.id,
-                            # 'user_ids':[(6, 0, self.env.user.id)],
                         }
                     )
                 record.calendar_id.compute_visible_users()
@@ -178,7 +175,7 @@ class CalendarEventProductLine(models.Model):
                         <br/>
                     </p>
                 """ % (
-                    _("Upload Pdfs to your agenda"),
-                    _("Use this feature to store pdfs you would like to share with your members"),
+                    _("Upload Documents to your agenda"),
+                    _("Use this feature to store Documents you would like to share with your members"),
                 )
             }

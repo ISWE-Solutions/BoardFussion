@@ -8,6 +8,7 @@
         <field name="view_mode">kanban,tree,form</field>
         <field name="domain">[('is_compliance', '=', True)]</field>
         <field name="context">{'default_is_compliance': True}</field>
+        <field name="view_id" ref="view_project_kanban_compliance"/>
     </record>
 
     <record id="project.open_view_project_all" model="ir.actions.act_window">

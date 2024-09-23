@@ -63,8 +63,8 @@ class KnowledgeArticle(models.Model):
                         <br/>
                     </p>
                 """ % (
-                    _("Upload Pdfs to your agenda"),
-                    _("Use this feature to store pdfs you would like to share with your members"),
+                    _("Upload Documents to your agenda"),
+                    _("Use this feature to store Documents you would like to share with your members"),
                 )
             }
 

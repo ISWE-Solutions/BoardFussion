@@ -8,7 +8,8 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="description" required="True" placeholder="Agenda Item"/>
+                            <field name="description" widget="textarea" placeholder="Agenda Item"
+                                   style="height: 150px; width: 120%; border:1px solid black;"/>
                             <field name="presenter_id" widget="many2many_tags" options="{'no_create': True}"
                                    placeholder="Presenters!"/>
                             <field name="pdf_attachment" widget="many2many_binary"

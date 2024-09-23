@@ -65,18 +65,18 @@
             </field>
         </record>
 
-        <record id="view_calendar_event_calendar_inherit" model="ir.ui.view">
-            <field name="name">calendar.event.calendar.inherit</field>
-            <field name="model">calendar.event</field>
-            <field name="inherit_id" ref="calendar.view_calendar_event_calendar"/>
-            <field name="arch" type="xml">
-                <!-- Ensure that clicking on the calendar opens the full form view -->
-                <xpath expr="//calendar" position="attributes">
-                    <attribute name="quick_create">false</attribute>
-                    <attribute name="event_open_popup">false</attribute>
-                </xpath>
-            </field>
-        </record>
+        <!--        <record id="view_calendar_event_calendar_inherit" model="ir.ui.view">-->
+        <!--            <field name="name">calendar.event.calendar.inherit</field>-->
+        <!--            <field name="model">calendar.event</field>-->
+        <!--            <field name="inherit_id" ref="calendar.view_calendar_event_calendar"/>-->
+        <!--            <field name="arch" type="xml">-->
+        <!--                &lt;!&ndash; Ensure that clicking on the calendar opens the full form view &ndash;&gt;-->
+        <!--                <xpath expr="//calendar" position="attributes">-->
+        <!--                    <attribute name="quick_create">false</attribute>-->
+        <!--                    <attribute name="event_open_popup">false</attribute>-->
+        <!--                </xpath>-->
+        <!--            </field>-->
+        <!--        </record>-->
 
         <!--        <template id="custom_calendar_popover_footer" inherit_id="web.CalendarCommonPopover.footer">-->
         <!--            <xpath expr="//a[contains(@class, 'o_cw_popover_edit')]" position="replace">-->
@@ -107,6 +107,25 @@
 
         <record id="appointment.appointment_menu_calendar" model="ir.ui.menu">
             <field name="active">False</field>
+        </record>
+
+
+        <record id="action_calendar_event" model="ir.actions.act_window">
+            <field name="name">Meetings</field>
+            <field name="res_model">calendar.event</field>
+            <field name="view_mode">calendar,tree,form</field>
+            <field name="view_id" ref="view_calendar_event_calendar"/>
+            <field name="search_view_id" ref="view_calendar_event_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No meetings found. Let's schedule one!
+                </p>
+                <p>
+                    The calendar is shared between employees and fully integrated with
+                    other applications such as the employee leaves or the business
+                    opportunities.
+                </p>
+            </field>
         </record>
 
     </data>

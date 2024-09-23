@@ -19,4 +19,74 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Form View for Project Task -->
+    <record id="view_task_form2_inherit_form_view" model="ir.ui.view">
+        <field name="name">project.task.form.inherit.checklist</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="arch" type="xml">
+            <field name="tag_ids" position="after">
+                <field name="checklist_progress" widget="progressbar"/>
+            </field>
+
+            <!-- Compliance Checklist Page -->
+            <page name="description_page" position="after">
+                <page name="compliance_checklist" string="Compliance Checklist"
+                      invisible="task_type != 'compliance'">
+                    <field name="task_checklist_ids">
+                        <tree editable="bottom">
+                            <field name="name"/>
+                            <field name="progress" string="Percentage Done"/>
+                            <field name="progress" widget="progressbar"/>
+                        </tree>
+                    </field>
+                </page>
+
+                <!-- Task Checklist Page -->
+                <page name="task_checklist" string="Task Checklist"
+                      invisible="task_type == 'compliance'">
+                    <field name="task_checklist_ids">
+                        <tree editable="bottom">
+                            <field name="name"/>
+                            <field name="progress" string="Percentage Done"/>
+                            <field name="progress" widget="progressbar"/>
+                        </tree>
+                    </field>
+                </page>
+            </page>
+
+        </field>
+    </record>
+
+    <!-- Tree View for Project Task -->
+    <record id="view_task_tree2_inherit_tree_view" model="ir.ui.view">
+        <field name="name">project.task.tree.inherit.checklist</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_tree2"/>
+        <field name="arch" type="xml">
+            <field name="stage_id" position="before">
+                <field name="checklist_progress" widget="progressbar"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Kanban View for Project Task -->
+    <record id="view_task_kanban_inherit" model="ir.ui.view">
+        <field name="name">project.task.kanban.inherit.checklist</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_kanban"/>
+        <field name="arch" type="xml">
+            <xpath expr="//templates" position="before">
+                <field name="checklist_progress"/>
+                <field name="max_rate"/>
+            </xpath>
+            <xpath expr="//field[@name='project_id']" position="after">
+                <li>
+                    <field name="checklist_progress" widget="gauge"
+                           options="{'max_field': 'max_rate',  'style': 'width:160px; height: 120px;'}"/>
+                </li>
+            </xpath>
+        </field>
+    </record>
 </odoo>

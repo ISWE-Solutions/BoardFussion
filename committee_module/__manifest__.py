@@ -27,6 +27,7 @@ Long description of module's purpose
         # data/hr_appraisal_templates_inherit.xml",
         "views/member_view.xml",
         "views/views.xml",
+        "views/email.xml",
         "views/templates.xml",
         "views/department_views_inherit.xml",
         "views/employee_views_inherit.xml",
