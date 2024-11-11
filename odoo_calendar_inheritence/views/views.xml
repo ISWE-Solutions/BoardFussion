@@ -1,5 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-
     <record id="action_point_form_view" model="ir.ui.view">
         <field name="name">action.point.form.view</field>
         <field name="model">calendar.event</field>
@@ -88,7 +88,7 @@
                 <field name="project_id"
                        invisible="1"
                 />
-<!--                <field name="is_user_restricted" invisible="1"/>-->
+                <!--                <field name="is_user_restricted" invisible="1"/>-->
                 <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
                         icon="fa-file-text-o">
                     <field name="document_count" widget="statinfo" string="Document"/>
@@ -132,7 +132,6 @@
 
 
             <xpath expr="//page[@name='page_invitations']" position="replace">
-                <page name="page_invitations" string="Invitations" invisible="not product_id">
                 <page name="page_invitations" string="Invitations" invisible="not product_id">
                     <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
                             class="oe_link"/>
@@ -178,7 +177,6 @@
             </xpath>
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
-                <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
                         <tree>
@@ -190,11 +188,11 @@
                             <field name="agenda" column_invisible='True'/>
                             <field name="description" string="Agenda Item"/>
                             <field name="presenter_id" widget="many2many_tags"/>
-                            <field name="is_user_restricted" column_invisible="1" />
-<!--                            <field name="Restricted" widget="many2many_tags" column_invisible="0" />-->
-<!--                            <field name="document_names" string="Document Names"/>-->
+                            <field name="is_user_restricted" column_invisible="1"/>
+                            <!--                            <field name="Restricted" widget="many2many_tags" column_invisible="0" />-->
+                            <!--                            <field name="document_names" string="Document Names"/>-->
                             <button name="action_open_documents" string="Attachments" type="object"
-                                    icon="fa-file-text-o" invisible="is_user_restricted, '=', False" />
+                                    icon="fa-file-text-o" invisible="is_user_restricted, '=', False"/>
                         </tree>
                     </field>
                     <div>
@@ -216,7 +214,6 @@
                                 confirm="Do you want to update the board pack?"/>
                     </div>
                 </page>
-                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                 <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>

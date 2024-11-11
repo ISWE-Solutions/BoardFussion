@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-
-
         <record id="hr.menu_hr_root" model="ir.ui.menu">
             <field name="name">Members</field>
         </record>
@@ -299,6 +297,23 @@
             </field>
         </record>
 
+        <record id="view_employee_filter_inherited" model="ir.ui.view">
+            <field name="name">hr.employee.search</field>
+            <field name="model">hr.employee</field>
+            <field name="arch" type="xml">
+                <search>
+                    <filter name="committee_filter" string="Committee Members"
+                            domain="[('committees_ids', '!=', False)]"/>
+                    <filter name="committee_none" string="Non-Committee Members"
+                            domain="[('committees_ids', '=', False)]"/>
+
+                    <group expand="1" string="Committees">
+                        <field name="committees_ids" string="Committees" context="{'group_by': 'committees_ids'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
         <record id="open_view_employee_list_my_inherited" model="ir.actions.act_window">
             <field name="name">Members</field>
             <field name="res_model">hr.employee</field>
@@ -316,23 +331,6 @@
                     can easily find all the information you need for each Member;
                     contact data, availability, etc.
                 </p>
-            </field>
-        </record>
-
-        <record id="view_employee_filter_inherited" model="ir.ui.view">
-            <field name="name">hr.employee.search</field>
-            <field name="model">hr.employee</field>
-            <field name="arch" type="xml">
-                <search>
-                    <filter name="committee_filter" string="Committee Members"
-                            domain="[('committees_ids', '!=', False)]"/>
-                    <filter name="committee_none" string="Non-Committee Members"
-                            domain="[('committees_ids', '=', False)]"/>
-
-                    <group expand="1" string="Committees">
-                        <field name="committees_ids" string="Committees" context="{'group_by': 'committees_ids'}"/>
-                    </group>
-                </search>
             </field>
         </record>
 
