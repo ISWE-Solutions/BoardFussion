@@ -75,7 +75,6 @@
                 </xpath>
             </field>
         </record>
-        </record>
 
         <record id="inherit_hr_department_hierarchy_view" model="ir.ui.view">
             <field name="name">inherit.hr.department.view.hierarchy</field>
