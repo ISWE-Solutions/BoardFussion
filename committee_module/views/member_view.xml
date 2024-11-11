@@ -2,6 +2,7 @@
 <odoo>
     <data>
 
+
         <record id="hr.menu_hr_root" model="ir.ui.menu">
             <field name="name">Members</field>
         </record>
@@ -73,6 +74,7 @@
 
                 </xpath>
             </field>
+        </record>
         </record>
 
         <record id="inherit_hr_department_hierarchy_view" model="ir.ui.view">

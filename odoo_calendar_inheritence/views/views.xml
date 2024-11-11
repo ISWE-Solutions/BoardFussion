@@ -79,6 +79,9 @@
             <xpath expr="//field[@name='description']" position="after">
                 <field name="product_id" invisible="1"/>
             </xpath>
+            <xpath expr="//field[@name='description']" position="after">
+                <field name="product_id" invisible="1"/>
+            </xpath>
 
             <xpath expr="//div[@name='button_box']" position="inside">
                 <field name="company_id" invisible="1"/>
@@ -130,6 +133,7 @@
 
             <xpath expr="//page[@name='page_invitations']" position="replace">
                 <page name="page_invitations" string="Invitations" invisible="not product_id">
+                <page name="page_invitations" string="Invitations" invisible="not product_id">
                     <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
                             class="oe_link"/>
                     <field name="attendee_ids" widget="one2many" mode="tree" readonly="1">
@@ -174,6 +178,7 @@
             </xpath>
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
+                <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
                         <tree>
@@ -211,6 +216,7 @@
                                 confirm="Do you want to update the board pack?"/>
                     </div>
                 </page>
+                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                 <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>

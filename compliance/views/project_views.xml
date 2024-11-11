@@ -2,6 +2,7 @@
 <odoo>
     <data>
 
+
         <record id="view_project_form_inherit_compliance" model="ir.ui.view">
             <field name="name">project.project.form.inherit.compliance</field>
             <field name="model">project.project</field>
