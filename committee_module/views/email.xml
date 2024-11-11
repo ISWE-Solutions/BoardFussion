@@ -1,50 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--    Email template -->
+<!--    Email template -->
     <data noupdate="1">
-        <record id="overdue_task_email_template" model="mail.template">
+        <record id="overdue_task_email_template_inherited" model="mail.template">
             <field name="name">Project Task Overdue: Send by email</field>
             <field name="model_id" ref="task_overdue_email_odoo.model_project_task"/>
             <field name="subject">Task Overdue Notification</field>
             <field name="email_to">{{ ctx.get('user_email') }}</field>
             <field name="body_html" type="html">
                 <html>
-                    Dear Employee
+                    Dear Member
                     <t t-esc="ctx.get('user_name')"/>
-                    <head>
-                        <style>
-                            body {
-                            font-family: Arial, sans-serif;
-                            }
-                            h1, p {
-                            color: #333;
-                            }
-                            table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            }
-                            th, td {
-                            padding: 8px;
-                            text-align: center;
-                            border: 1px solid #ddd;
-                            }
-                            th {
-                            background: linear-gradient(90deg, grey, #714b67);
-                            color: white;
-                            }
-                            td {
-                            background-color: #f9f9f9;
-                            }
-                            tr:nth-child(even) td {
-                            background-color: #f1f1f1;
-                            }
-                            p {
-                            margin-top: 20px;
-                            }
-                        </style>
-                    </head>
+                    <head>Overdue Task List</head>
                     <table border="1" style="width:100%">
-                        <thead>
+                        <thead style="background: linear-gradient(to right, #714b67, white);">
                             <tr>
                                 <th align="center">Project</th>
                                 <th align="center">Task</th>

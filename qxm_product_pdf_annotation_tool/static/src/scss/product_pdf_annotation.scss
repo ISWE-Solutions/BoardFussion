@@ -53,6 +53,7 @@
         cursor:pointer;
         position:absolute;
       }
+      
     .custom-description-input {
         padding: 10px;
         width: 100%;
@@ -72,4 +73,14 @@
             height: 12px;
         }
       }
+
+    .highlight {
+        position: absolute;
+        background-color: rgba(17, 0, 255, 0.5);
+    }
+    .textLayer {
+        position: absolute;
+        pointer-events: none;
+        opacity: 0;
+    }
 }

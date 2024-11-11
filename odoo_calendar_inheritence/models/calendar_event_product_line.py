@@ -9,7 +9,7 @@ class CalendarEventProductLine(models.Model):
     _order = 'sequence'
 
     sequence = fields.Integer(string='Sequence', default=10)
-    calendar_id = fields.Many2one('calendar.event', string="Calendar Event")
+    # calendar_id = fields.Many2one('calendar.event', string="Calendar Event")
     product_id = fields.Many2one('product.template', string="Product")
     quantity = fields.Float(string="Quantity")
     uom_id = fields.Many2one('uom.uom', string="Unit of Measure")
@@ -21,6 +21,29 @@ class CalendarEventProductLine(models.Model):
     description = fields.Html(string='Description')
     time = fields.Char(string='Time')
     pdf_attachment = fields.Many2many('ir.attachment', string='Add Attachments')
+    calendar_id = fields.Many2one('calendar.event', string="Calendar Event", required=True)
+
+    Restricted = fields.Many2many(
+        'res.partner',
+        'calendar_event_product_line_res_partner_rel',  # Unique relation table name
+        string="Document Restricted Visibility",
+        store=True
+    )
+
+    is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
+
+    @api.depends('Restricted')
+    def _compute_is_user_restricted(self):
+        for record in self:
+            record.is_user_restricted = self.env.user.partner_id in record.Restricted
+
+    document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
+
+    @api.depends('pdf_attachment')
+    def _compute_document_names(self):
+        for line in self:
+            document_names = line.pdf_attachment.mapped('name')
+            line.document_names = ', '.join(document_names)
 
     @api.model_create_multi
     def create(self, values):
@@ -31,16 +54,13 @@ class CalendarEventProductLine(models.Model):
             product = record.product_id
             if record.pdf_attachment:
                 for attachment in record.pdf_attachment:
-                    # merged_pdf_content = base64.b64encode(attachment.datas.read())
                     attachment_data = attachment.datas
-                    # attachment_bytes = base64.b64encode(attachment_data)
                     new_document = document_model.sudo().create(
                         {
                             'res_model': 'product.template',
-                            'name':attachment.name,
-                            'res_id':product.id,
+                            'name': attachment.name,
+                            'res_id': product.id,
                             'ir_attachment_id': attachment.id,
-                            # 'user_ids':[(6, 0, self.env.user.id)],
                         }
                     )
                 record.calendar_id.compute_visible_users()
@@ -149,36 +169,45 @@ class CalendarEventProductLine(models.Model):
         products_to_delete.unlink()
 
     def action_open_documents(self):
+        self.ensure_one()
         company_id = self.env.company.id
-        for rec in self:
-            return {
-                'name': _('Documents'),
-                'type': 'ir.actions.act_window',
-                'res_model': 'product.document',
-                'view_mode': 'kanban,tree,form',
-                'context': {
-                    'default_res_model': rec.product_id._name,
-                    'default_res_id': rec.product_id.id,
-                    'default_company_id': company_id,
-                },
-                'domain': [
-                    '|',
-                    '&', ('res_model', '=', 'product.template'), ('res_id', '=', rec.product_id.id),
-                    '&',
-                    ('res_model', '=', 'product.template'),
-                    ('res_id', 'in', rec.product_id.product_variant_ids.ids),
-                ],
-                'target': 'current',
-                'help': """
-                    <p class="o_view_nocontent_smiling_face">
-                        %s
-                    </p>
-                    <p>
-                        %s
-                        <br/>
-                    </p>
-                """ % (
-                    _("Upload Pdfs to your agenda"),
-                    _("Use this feature to store pdfs you would like to share with your members"),
-                )
-            }
+
+        # Collect the attachment IDs from the `pdf_attachment` field.
+        attachment_ids = self.pdf_attachment.ids
+
+        # Debug prints to track values
+        print("Company ID:", company_id)
+        print("Current Product Line ID:", self.id)
+        print("Attachment IDs in pdf_attachment:", attachment_ids)
+
+        # Check if there are any matching product documents
+        matching_documents = self.env['product.document'].search([('ir_attachment_id', 'in', attachment_ids)])
+        print("Matching Product Document IDs:", matching_documents.ids)
+
+        return {
+            'name': _('Documents'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'product.document',
+            'view_mode': 'kanban,tree,form',
+            'context': {
+                'default_res_model': 'product.template',
+                'default_res_id': self.product_id.id,
+                'default_company_id': company_id,
+            },
+            'domain': [
+                ('ir_attachment_id', 'in', attachment_ids),
+            ],
+            'target': 'current',
+            'help': """
+                <p class="o_view_nocontent_smiling_face">
+                    %s
+                </p>
+                <p>
+                    %s
+                    <br/>
+                </p>
+            """ % (
+                _("Upload Documents to your agenda"),
+                _("Use this feature to store Documents you would like to share with your members"),
+            )
+        }

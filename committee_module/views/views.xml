@@ -4,16 +4,20 @@
     <data>
         <record id="hr.menu_hr_department_tree" model="ir.ui.menu">
             <field name="name">Committees</field>
+                <field name="action" ref="committee_module.hr_department_kanban_action_inherited"/>
         </record>
         <record id="hr.menu_hr_department_kanban" model="ir.ui.menu">
             <field name="name">Committees</field>
+            <field name="action" ref="committee_module.hr_department_kanban_action_inherited"/>
         </record>
         <record id="hr.hr_department_tree_action" model="ir.actions.act_window">
             <field name="name">Committees</field>
         </record>
+
         <record id="hr.hr_department_kanban_action" model="ir.actions.act_window">
             <field name="name">Committees</field>
         </record>
+
         <record id="hr.hr_menu_hr_reports" model="ir.ui.menu">
             <field name="active">False</field>
         </record>

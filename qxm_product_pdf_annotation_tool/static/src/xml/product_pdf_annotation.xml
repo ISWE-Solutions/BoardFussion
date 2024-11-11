@@ -13,6 +13,8 @@
                             <div id="pdf-container"/>
                         </div>
                         <div class="col-sm-3" id="description_container">
+                            <button id="annotateIcon" class="fa fa-pencil"/>
+                                <!-- Annotate</button> -->
                             <table class="table">
                                 <thead class="sticky-top">
                                     <tr>

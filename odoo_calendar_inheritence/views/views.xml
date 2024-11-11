@@ -6,12 +6,9 @@
         <field name="arch" type="xml">
             <form>
                 <field name="company_id" invisible="1"/>
-                <!--                <field name="new_project_id"/>-->
                 <field name="new_task_name"/>
-                <!--                <field name="stage_id"/>-->
                 <field name="user_ids"/>
                 <field name="date_deadline"/>
-                <!--                <field name="user_ids"/>-->
             </form>
         </field>
     </record>
@@ -88,6 +85,7 @@
                 <field name="project_id"
                        invisible="1"
                 />
+<!--                <field name="is_user_restricted" invisible="1"/>-->
                 <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
                         icon="fa-file-text-o">
                     <field name="document_count" widget="statinfo" string="Document"/>
@@ -126,7 +124,7 @@
             </xpath>
 
             <xpath expr="//field[@name='privacy']" position="attributes">
-                <attribute name="invisible">1</attribute>
+                <attribute name="invisible">0</attribute>
             </xpath>
 
 
@@ -140,14 +138,6 @@
                             <field name="email" widget="email"/>
                             <field name="phone" widget="phone"/>
                             <field name="state"/>
-<!--                            <button name="do_tentative" invisible="state not in ('needsAction', 'declined', 'accepted')"-->
-<!--                                    string="Uncertain" type="object" icon="fa-asterisk"/>-->
-<!--                            <button name="do_accept" string="Accept"-->
-<!--                                    invisible="state not in ('needsAction', 'tentative', 'declined')" type="object"-->
-<!--                                    icon="fa-check text-success"/>-->
-<!--                            <button name="do_decline" string="Decline"-->
-<!--                                    invisible="state not in ('needsAction', 'tentative', 'accepted')" type="object"-->
-<!--                                    icon="fa-times-circle text-danger"/>-->
                         </tree>
                         <kanban class="o_kanban_mobile" create="false" delete="false">
                             <field name="partner_id"/>
@@ -195,8 +185,11 @@
                             <field name="agenda" column_invisible='True'/>
                             <field name="description" string="Agenda Item"/>
                             <field name="presenter_id" widget="many2many_tags"/>
-                            <!--                            <button name="action_open_documents" string="Attachments" type="object"-->
-                            <!--                                    icon="fa-file-text-o"/>-->
+                            <field name="is_user_restricted" column_invisible="1" />
+<!--                            <field name="Restricted" widget="many2many_tags" column_invisible="0" />-->
+<!--                            <field name="document_names" string="Document Names"/>-->
+                            <button name="action_open_documents" string="Attachments" type="object"
+                                    icon="fa-file-text-o" invisible="is_user_restricted, '=', False" />
                         </tree>
                     </field>
                     <div>

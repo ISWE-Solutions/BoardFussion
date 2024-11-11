@@ -35,7 +35,6 @@ Long description of module's purpose
 
     # always loaded
 
-
     'data': [
         'security/res_groups.xml',
         'security/custom_calendar_access_rights.xml',
@@ -63,11 +62,13 @@ Long description of module's purpose
     'assets': {
         'web.assets_backend': [
             'odoo_calendar_inheritence/static/src/js/custom_confirm.js',
+            'odoo_calendar_inheritence/static/src/js/calendar_event_restriction.js',
+            'odoo_calendar_inheritence/static/src/css/agenda_lines.css',
         ],
     },
     # only loaded in demonstration mode
     'demo': [
         'demo/demo.xml',
     ],
+    'license': "LGPL-3",
 }
-

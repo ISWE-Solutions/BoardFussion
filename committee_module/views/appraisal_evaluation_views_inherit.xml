@@ -47,9 +47,9 @@
             </field>
         </record>
 
-<!--        <record id="hr_appraisal_report.menu_appraisal_analysis_report" model="ir.actions.act_window">-->
-<!--            <field name="name">Evaluation Analysis</field>-->
-<!--        </record>-->
+        <!--        <record id="hr_appraisal_report.menu_appraisal_analysis_report" model="ir.actions.act_window">-->
+        <!--            <field name="name">Evaluation Analysis</field>-->
+        <!--        </record>-->
 
         <!--        <record id="action_appraisal_report_all" model="ir.actions.act_window">-->
         <!--            <field name="name">Custom Appraisal Report</field>-->
@@ -287,6 +287,56 @@
             </field>
         </record>
 
+        <record id="inherited_appraisal_ask_feedback_view_form" model="ir.ui.view">
+            <field name="name">inherited.appraisal.ask.feedback.view.form</field>
+            <field name="model">appraisal.ask.feedback</field>
+            <field name="inherit_id" ref="hr_appraisal_survey.appraisal_ask_feedback_view_form"/>
+            <field name="arch" type="xml">
+                <field name="employee_ids" position="attributes">
+                    <attribute name="placeholder">Add Members...</attribute>
+                </field>
+            </field>
+        </record>
+
+        <record id="committee_module.action_hr_appraisal_goal_inherited" model="ir.actions.act_window">
+            <field name="name">Goals</field>
+            <field name="res_model">hr.appraisal.goal</field>
+            <field name="view_mode">kanban,tree,form,graph</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create new goals
+                </p>
+                <p>
+                    Assign Goals to motivate your Members and keep track of their objectives between Evaluations.
+                </p>
+            </field>
+        </record>
+
+
+        <record id="hr_appraisal.menu_hr_appraisal_goal" model="ir.ui.menu">
+            <field name="name">Goals</field>
+            <field name="action" ref="committee_module.action_hr_appraisal_goal_inherited"/>
+        </record>
+
+        <record model="ir.actions.act_window" id="open_view_hr_appraisal_tree_inherited">
+            <field name="name">Evaluation</field>
+            <field name="res_model">hr.appraisal</field>
+            <field name="view_mode">kanban,tree,gantt,calendar,form,activity</field>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Schedule an Evaluation
+                </p>
+                <p>
+                    Plan Evaluations with your Members, collect and discuss feedback.
+                </p>
+            </field>
+        </record>
+
+        <record id="hr_appraisal.menu_open_view_hr_appraisal_tree" model="ir.ui.menu">
+            <field name="name">Evaluation</field>
+            <field name="action" ref="committee_module.open_view_hr_appraisal_tree_inherited"/>
+        </record>
 
     </data>
 </odoo>

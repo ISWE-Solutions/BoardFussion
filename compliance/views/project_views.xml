@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
     <data>
+
         <record id="view_project_form_inherit_compliance" model="ir.ui.view">
             <field name="name">project.project.form.inherit.compliance</field>
             <field name="model">project.project</field>
@@ -19,8 +20,12 @@
                            placeholder="e.g. Example Action Point" invisible="is_compliance"/>
                 </xpath>
 
-                <xpath expr="//div/h1/field[@name='name']" position="after">
-                    <field name="project_progress" widget="progressbar"/>
+                <xpath expr="//div[@class='oe_title']" position="inside">
+                    <h1>
+                        <group>
+                            <field name="project_progress" widget="progressbar"/>
+                        </group>
+                    </h1>
                 </xpath>
 
                 <xpath expr="//notebook/page/field[@name='description']" position="replace">
@@ -36,45 +41,224 @@
         <record id="inherit_view_project_kanban" model="ir.ui.view">
             <field name="name">project.project.kanban.inherit</field>
             <field name="model">project.project</field>
-            <field name="inherit_id" ref="project.view_project_kanban"/> <!-- Use the correct module name -->
+            <field name="inherit_id" ref="project.view_project_kanban"/>
             <field name="arch" type="xml">
-                <!-- Inherit and modify the kanban view -->
                 <kanban position="attributes">
                     <attribute name="on_create"/>
                     <attribute name="quick_create_view"/>
                 </kanban>
-            </field>
-        </record>
-
-        <record id="view_project_kanban_inherit" model="ir.ui.view">
-            <field name="name">project.project.kanban.inherit.gauge</field>
-            <field name="model">project.project</field>
-            <field name="inherit_id" ref="project.view_project_kanban"/>
-            <field name="arch" type="xml">
-                <xpath expr="//field[@name='open_task_count']" position="before">
-                    <div t-if="record.project_progress.raw_value">
-                        <div style="text-align: center;">
-                            <field name="project_progress" widget="gauge"
-                                   options="{'max_field': '100', 'style': 'width:160px; height:120px;'}"/>
-                        </div>
-                    </div>
+                <xpath expr="//div[contains(@class, 'o_kanban_record_bottom')]" position="before">
+                    <field name="is_compliance" invisible="1"/>
+                    <field name="max_progress" invisible="1"/>
+                    <field name="project_progress" widget="gauge" invisible="not is_compliance"
+                           options="{'max_field': 'max_progress', 'title': 'Progress', 'style': 'width:160px; height: 120px;'}"/>
                 </xpath>
+
             </field>
         </record>
 
+        <record model="ir.ui.view" id="view_project_kanban_compliance">
+            <field name="name">project.project.kanban</field>
+            <field name="model">project.project</field>
+            <field name="arch" type="xml">
+                <kanban
+                        class="o_kanban_dashboard o_project_kanban o_emphasize_colors"
+                        js_class="project_project_kanban"
+                        action="action_view_tasks" type="object"
+                        sample="1"
+                        default_order="is_favorite desc, sequence, name, id"
+                >
+                    <field name="display_name"/>
+                    <field name="partner_id"/>
+                    <field name="color"/>
+                    <field name="task_count"/>
+                    <field name="closed_task_count"/>
+                    <field name="open_task_count"/>
+                    <field name="milestone_count_reached"/>
+                    <field name="milestone_count"/>
+                    <field name="allow_milestones"/>
+                    <field name="label_tasks"/>
+                    <field name="alias_email"/>
+                    <field name="is_favorite"/>
+                    <field name="rating_count"/>
+                    <field name="rating_avg"/>
+                    <field name="rating_status"/>
+                    <field name="rating_active"/>
+                    <field name="analytic_account_id"/>
+                    <field name="date"/>
+                    <field name="privacy_visibility"/>
+                    <field name="last_update_color"/>
+                    <field name="last_update_status"/>
+                    <field name="tag_ids"/>
+                    <progressbar field="last_update_status"
+                                 colors='{"on_track": "success", "at_risk": "warning", "off_track": "danger", "on_hold": "info", "done": "purple"}'/>
+                    <field name="sequence" widget="handle"/>
+                    <templates>
+                        <t t-name="kanban-menu" groups="base.group_user">
+                            <div class="container">
+                                <div class="row">
+                                    <div class="col-6 o_kanban_card_manage_section o_kanban_manage_view">
+                                        <h5 role="menuitem" class="o_kanban_card_manage_title">
+                                            <span>View</span>
+                                        </h5>
+                                        <div role="menuitem">
+                                            <a name="action_view_tasks" type="object">Tasks</a>
+                                        </div>
+                                        <div role="menuitem" groups="project.group_project_milestone"
+                                             t-if="record.allow_milestones.raw_value">
+                                            <a name="action_get_list_view" type="object">Milestones</a>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 o_kanban_card_manage_section o_kanban_manage_reporting">
+                                        <h5 role="menuitem" class="o_kanban_card_manage_title"
+                                            groups="project.group_project_user">
+                                            <span>Reporting</span>
+                                        </h5>
+                                        <div role="menuitem" groups="project.group_project_user"
+                                             class="o_kanban_task_analysis">
+                                            <a name="action_view_tasks_analysis" type="object">Tasks Analysis</a>
+                                        </div>
+                                        <div role="menuitem" name="project_burndown_menu"
+                                             groups="project.group_project_user">
+                                            <a name="action_project_task_burndown_chart_report" type="object">Burndown
+                                                Chart
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_card_manage_settings row">
+                                    <div role="menuitem" aria-haspopup="true" class="col-6"
+                                         groups="project.group_project_manager">
+                                        <ul class="oe_kanban_colorpicker" data-field="color" role="popup"/>
+                                    </div>
+                                    <div role="menuitem" class="col-6" groups="project.group_project_manager">
+                                        <a t-if="record.privacy_visibility.raw_value == 'portal'" class="dropdown-item"
+                                           role="menuitem" name="%(project.project_share_wizard_action)d" type="action"
+                                           context="{'dialog_size': 'medium'}">Share
+                                        </a>
+                                        <a class="dropdown-item" role="menuitem" type="edit">Settings</a>
+                                    </div>
+                                    <div class="o_kanban_card_manage_section o_kanban_manage_view col-12 ps-0"
+                                         groups="!project.group_project_manager">
+                                        <div role="menuitem" class="w-100">
+                                            <a class="dropdown-item mx-0" role="menuitem" type="open">View</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                        <t t-name="kanban-box">
+                            <div t-attf-class="#{kanban_color(record.color.raw_value)} oe_kanban_global_click o_has_icon oe_kanban_content oe_kanban_card">
+                                <div class="o_project_kanban_main d-flex align-items-baseline gap-1">
+                                    <field name="is_favorite" widget="boolean_favorite" nolabel="1" force_save="1"/>
+                                    <div class="o_kanban_card_content mw-100">
+                                        <div class="o_kanban_primary_left">
+                                            <div class="o_primary me-5">
+                                                <span class="o_text_overflow" t-att-title="record.display_name.value">
+                                                    <t t-esc="record.display_name.value"/>
+                                                </span>
+                                                <span class="o_text_overflow text-muted" t-if="record.partner_id.value">
+                                                    <span class="fa fa-user me-2" aria-label="Partner"
+                                                          title="Partner"></span>
+                                                    <t t-esc="record.partner_id.value"/>
+                                                </span>
+                                                <div t-if="record.date.raw_value or record.date_start.raw_value"
+                                                     class="text-muted o_row">
+                                                    <span class="fa fa-clock-o me-2" title="Dates"></span>
+                                                    <field name="date_start"/>
+                                                    <i t-if="record.date.raw_value and record.date_start.raw_value"
+                                                       class="fa fa-long-arrow-right mx-2 oe_read_only"
+                                                       aria-label="Arrow icon" title="Arrow"/>
+                                                    <field name="date"/>
+                                                </div>
+                                                <div t-if="record.alias_email.value" class="text-muted text-truncate"
+                                                     t-att-title="record.alias_email.value">
+                                                    <span class="fa fa-envelope-o me-2" aria-label="Domain Alias"
+                                                          title="Domain Alias"></span>
+                                                    <t t-esc="record.alias_email.value"/>
+                                                </div>
+                                                <div t-if="record.rating_active.raw_value and record.rating_count.raw_value &gt; 0"
+                                                     class="text-muted" groups="project.group_project_rating">
+                                                    <b class="me-1">
+                                                        <span style="font-weight:bold;"
+                                                              class="fa mt4 fa-smile-o text-success"
+                                                              t-if="record.rating_avg.raw_value &gt;= 3.66"
+                                                              title="Average Rating: Satisfied" role="img"
+                                                              aria-label="Happy face"/>
+                                                        <span style="font-weight:bold;"
+                                                              class="fa mt4 fa-meh-o text-warning"
+                                                              t-elif="record.rating_avg.raw_value &gt;= 2.33"
+                                                              title="Average Rating: Okay" role="img"
+                                                              aria-label="Neutral face"/>
+                                                        <span style="font-weight:bold;"
+                                                              class="fa mt4 fa-frown-o text-danger" t-else=""
+                                                              title="Average Rating: Dissatisfied" role="img"
+                                                              aria-label="Sad face"/>
+                                                    </b>
+                                                    <t t-if="record.rating_avg.raw_value % 1 == 0">
+                                                        <field name="rating_avg" nolabel="1" widget="float"
+                                                               digits="[1, 0]"/>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <field name="rating_avg" nolabel="1" widget="float"
+                                                               digits="[1, 1]"/>
+                                                    </t>
+                                                    / 5
+                                                </div>
+                                                <field name="tag_ids" widget="many2many_tags"
+                                                       options="{'color_field': 'color'}"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <field name="is_compliance" invisible="1"/>
+                                <field name="max_progress" invisible="1"/>
+                                <field name="project_progress" widget="gauge" invisible="project_progress == 0 or not is_compliance"
+                                       options="{'max_field': 'max_progress', 'title': 'Progress', 'style': 'width:160px; height: 120px;'}"/>
+                                <div class="o_kanban_record_bottom mt-3">
+                                    <div class="oe_kanban_bottom_left">
+                                        <div class="o_project_kanban_boxes d-flex align-items-baseline">
+                                            <a class="o_project_kanban_box" name="action_view_tasks" type="object">
+                                                <div>
+                                                    <span class="o_value">
+                                                        <t t-esc="record.open_task_count.value"/>
+                                                    </span>
+                                                    <span class="o_label ms-1">
+                                                        <t t-esc="record.label_tasks.value"/>
+                                                    </span>
+                                                </div>
+                                            </a>
+                                            <a groups='project.group_project_milestone'
+                                               t-if="record.allow_milestones and record.allow_milestones.raw_value and record.milestone_count.raw_value &gt; 0"
+                                               class="o_kanban_inline_block btn-link text-dark small"
+                                               role="button"
+                                               name="action_get_list_view"
+                                               type="object"
+                                               t-attf-title="#{record.milestone_count_reached.value} Milestones reached out of #{record.milestone_count.value}"
+                                            >
+                                                <span class="fa fa-flag me-1"/>
+                                                <t t-out="record.milestone_count_reached.value"/>/
+                                                <t t-out="record.milestone_count.value"/>
+                                            </a>
+                                        </div>
+                                        <field name="activity_ids" widget="kanban_activity"/>
+                                    </div>
+                                    <div class="oe_kanban_bottom_right">
+                                        <field name="user_id" widget="many2one_avatar_user"
+                                               domain="[('share', '=', False)]"/>
+                                        <field t-if="record.last_update_status.value &amp;&amp; widget.editable"
+                                               name="last_update_status" widget="project_state_selection"/>
+                                        <span t-if="record.last_update_status.value &amp;&amp; !widget.editable"
+                                              t-att-class="'o_status_bubble mx-0 o_color_bubble_' + record.last_update_color.value"
+                                              t-att-title="record.last_update_status.value"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
 
-        <!--        <record id="view_project_kanban_inherit_progress" model="ir.ui.view">-->
-        <!--            <field name="name">project.project.kanban.inherit.progress</field>-->
-        <!--            <field name="model">project.project</field>-->
-        <!--            <field name="inherit_id" ref="project.view_project_config_kanban"/>-->
-        <!--            <field name="arch" type="xml">-->
-        <!--                <xpath expr="//div[@class='oe_kanban_content']" position="inside">-->
-        <!--                    &lt;!&ndash; Display the gauge widget for project progress &ndash;&gt;-->
-        <!--                    <field name="project_progress" widget="gauge"-->
-        <!--                           options="{'max_field': 'max_rate', 'min': 0, 'max': 100}"-->
-        <!--                           class="oe_kanban_gauge" style="width:160px; height:120px;"/>-->
-        <!--                </xpath>-->
-        <!--            </field>-->
-        <!--        </record>-->
     </data>
 </odoo>

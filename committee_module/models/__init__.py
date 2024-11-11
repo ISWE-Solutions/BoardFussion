@@ -9,4 +9,4 @@ from . import hr_appraisal
 from . import hr_users
 from . import hr_contract
 from . import project_task
-
+from . import res_partner

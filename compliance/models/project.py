@@ -1,4 +1,5 @@
-from odoo import models, fields, api
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 
 class ProjectProject(models.Model):
@@ -6,7 +7,8 @@ class ProjectProject(models.Model):
 
     is_compliance = fields.Boolean(string='Is Compliance', default=False, readonly=True)
     compliance_tag = fields.Many2one('project.tags', string='Compliance Tag')
-    project_progress = fields.Float(compute='_compute_project_progress', string='Project/Compliance Progress', store=True)
+    project_progress = fields.Float(compute='_compute_project_progress', string='', store=True)
+    max_progress = fields.Float(string='Max Progress', default=100)
 
     def create_compliance_project(self, values):
         values.update({
@@ -78,3 +80,9 @@ class TaskChecklist(models.Model):
     def _compute_is_done(self):
         for checklist in self:
             checklist.is_done = checklist.progress == 100
+
+    @api.constrains('progress')
+    def _check_progress(self):
+        for record in self:
+            if record.progress > 100:
+                raise ValidationError('Progress must not be more than 100.')

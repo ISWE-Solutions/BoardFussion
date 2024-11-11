@@ -3,3 +3,4 @@
 
 from . import pdf_annotation_line
 from . import product_document
+from . import pdf_annotation_highlight

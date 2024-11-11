@@ -4,21 +4,30 @@
         <field name="name">calendar.event.product.line.form.view</field>
         <field name="model">calendar.event.product.line</field>
         <field name="arch" type="xml">
-            <form create="0" delete="0" string="Agenda Form">
+            <form create="0" delete="0" string="Agenda Form" class="larger-wizard modal-xl">
                 <sheet>
-                    <group>
+                    <div class="o_group">
                         <group>
-                            <field name="description" required="True" placeholder="Agenda Item"/>
+                            <!-- Description Field -->
+                            <field name="description" widget="textarea" placeholder="Agenda Item"
+                                   class="larger-description"/>
+                        </group>
+                        <group>
+                            <!-- Presenter and Add Attachments Fields -->
                             <field name="presenter_id" widget="many2many_tags" options="{'no_create': True}"
                                    placeholder="Presenters!"/>
+                            <field name="is_user_restricted" invisible="1" />
                             <field name="pdf_attachment" widget="many2many_binary"
-                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary" placeholder="Attachments" invisible="is_user_restricted, '=', False" />
+                             <field name="Restricted" widget="many2many_tags"
+                               groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                         </group>
-                    </group>
+                    </div>
                 </sheet>
             </form>
         </field>
     </record>
+
 
     <record id="calendar_event_product_line_tree_view" model="ir.ui.view">
         <field name="name">calendar.event.product.line.tree.view</field>
@@ -27,7 +36,7 @@
             <tree>
                 <field name="description" string="Agenda Item"/>
                 <field name="product_id" column_invisible="1"/>
-                <field name="presenter_id" widget="many2many_tags"/>
+<!--                <field name="presenter_id" widget="many2many_tags"/>-->
                 <button name="action_open_documents" string="Attachments" type="object"
                         icon="fa-file-text-o"/>
             </tree>

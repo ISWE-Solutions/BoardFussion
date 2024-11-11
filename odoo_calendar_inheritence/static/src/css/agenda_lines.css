@@ -1,0 +1,26 @@
+/* Make the entire wizard bigger */
+.larger-wizard {
+    height: 80%;
+    padding: 20px;
+    font-size: 16px;
+}
+
+/* Make the description textarea larger */
+.larger-description {
+    width: 100%;  /* Make the textarea full width */
+    height: 25rem;  /* Adjust height to fit */
+    font-size: 18px;
+    border: 2px solid black;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+@media (min-width: 992px) {
+    .modal-lg, .modal-xl, .larger-wizard {
+        max-width: 88%;
+        margin-right:auto;
+        margin-left:auto;
+
+    }
+}
+

@@ -156,10 +156,17 @@ class PDFCustomPreview extends Component {
 //            this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
 //        });
 
+        // const lines = this.data.lines[pageNum] || [];
+        // for (const line of lines) {
+        //     line_count += 1;
+        //     this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
+        // }
+
+        // After Highlighting Edition..
         const lines = this.data.lines[pageNum] || [];
         for (const line of lines) {
             line_count += 1;
-            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
+            this.createMarkerDOM(line.layerx, line.layery, line.height, line.width, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
         }
     }
 
@@ -170,25 +177,49 @@ class PDFCustomPreview extends Component {
 //        return { x, y };
 //    }
 
-    createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
-        console.log(user,'test');
-        const markerDiv = this.createMarkerDiv(x, y, line_id);
-        canvasWrapper.appendChild(markerDiv);
+    // OLD BEFORE HIGHLIGHT
+    // createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
+    //     console.log(user,'test');
+    //     const markerDiv = this.createMarkerDiv(x, y, line_id);
+    //     canvasWrapper.appendChild(markerDiv);
 
+    //     const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
+    //     this.table_tbody.el.appendChild(newTableRow);
+
+    //     this.makeDraggable(markerDiv, line_id);
+    // }
+
+    createMarkerDOM(x, y, height, width, description, line_id,user, canvasWrapper, pageNum, line_count) {
+        console.log(user,'test');
+        const markerDiv = this.createMarkerDiv(x, y, line_id, width, height );
+        canvasWrapper.appendChild(markerDiv);
         const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
         this.table_tbody.el.appendChild(newTableRow);
-
         this.makeDraggable(markerDiv, line_id);
+                                               
     }
 
-    createMarkerDiv(x, y, line_id) {
+    createMarkerDiv(x, y, line_id, width, height) {
         const markerDiv = document.createElement('div');
+        markerDiv.style.position = 'absolute';
         markerDiv.style.left = `${x}px`;
         markerDiv.style.top = `${y}px`;
+        markerDiv.style.width = `${width}px`;
+        markerDiv.style.height = `${height}px`;
+        markerDiv.style.backgroundColor = 'yellow';
+        markerDiv.style.opacity = '0.5';
         markerDiv.id = `marker_${line_id}`;
-        markerDiv.classList.add('img_marker');
         return markerDiv;
     }
+    // OLD BEFORE HIGHLIGHT
+    // createMarkerDiv(x, y, line_id) {
+    //     const markerDiv = document.createElement('div');
+    //     markerDiv.style.left = `${x}px`;
+    //     markerDiv.style.top = `${y}px`;
+    //     markerDiv.id = `marker_${line_id}`;
+    //     markerDiv.classList.add('img_marker');
+    //     return markerDiv;
+    // }
 
     async createLine(x, y, page_no) {
         const [line_id] = await this.orm.create("product.pdf.annotation.line", [{

@@ -81,12 +81,14 @@
                 <field name="checklist_progress"/>
                 <field name="max_rate"/>
             </xpath>
-            <xpath expr="//field[@name='project_id']" position="after">
+
+            <xpath expr="//div[contains(@class, 'o_kanban_record_top')]" position="after">
                 <li>
                     <field name="checklist_progress" widget="gauge"
                            options="{'max_field': 'max_rate',  'style': 'width:160px; height: 120px;'}"/>
                 </li>
             </xpath>
+
         </field>
     </record>
 </odoo>

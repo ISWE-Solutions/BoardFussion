@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
+
         <record id="hr.menu_hr_root" model="ir.ui.menu">
             <field name="name">Members</field>
         </record>
@@ -13,17 +14,25 @@
             <field name="name">Members</field>
         </record>
 
-        <record id="hr.menu_hr_employee_user" model="ir.ui.menu">
-            <field name="name">Members</field>
-        </record>
 
         <record id="hr.open_view_employee_list_my" model="ir.actions.act_window">
             <field name="name">Members</field>
         </record>
 
-        <!--        <record id="hr_contract_salary_payroll.hr_payroll_menu_contract_type" model="ir.ui.menu">-->
-        <!--            <field name="name">Member Types</field>-->
-        <!--        </record>-->
+
+        <record id="inherit_hr_department_hierarchy_view" model="ir.ui.view">
+            <field name="name">inherit.hr.department.view.hierarchy</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr_org_chart.hr_department_hierarchy_view"/>
+            <field name="arch" type="xml">
+                <!-- Locate the button containing the "Employees" text and replace it with "Members" -->
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']/t" position="replace">
+                    <t t-out="record.total_employee.raw_value"/>
+                    Members
+                </xpath>
+            </field>
+        </record>
+
 
         <record id="hr_employee_tree_inherited" model="ir.ui.view">
             <field name="name">hr_employee_tree_inherited</field>
@@ -37,30 +46,23 @@
             </field>
         </record>
 
-        <!--        <record id="act_member_from_committees" model="ir.actions.act_window">-->
-        <!--            <field name="name">Members</field>-->
-        <!--            <field name="res_model">hr.employee</field>-->
-        <!--            <field name="view_mode">tree,kanban,form</field>-->
-        <!--            <field name="search_view_id" ref="view_employee_filter"/>-->
-        <!--            <field name="context">{-->
-        <!--                "searchpanel_default_committees_ids": active_id,-->
-        <!--                "default_committees_ids": active_id,-->
-        <!--                "search_default_group_department": 1,-->
-        <!--                "search_default_committees_ids": active_id,-->
-        <!--                "expand": 1}-->
-        <!--            </field>-->
-        <!--            <field name="help" type="html">-->
-        <!--                <p class="o_view_nocontent_smiling_face">-->
-        <!--                    Add a new member-->
-        <!--                </p>-->
-        <!--                <p>-->
-        <!--                    With just a quick glance on the Odoo member screen, you-->
-        <!--                    can easily find all the information you need for each person;-->
-        <!--                    contact data, job position, availability, etc.-->
-        <!--                </p>-->
-        <!--            </field>-->
-        <!--        </record>-->
-        <!--        #Removes Group Create From Kanban Showing +Department-->
+
+        <record id="hr_employee_view_search_custom" model="ir.ui.view">
+            <field name="name">hr.employee.view.search.inherit.appraisal</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//filter[@name='next_appraisal']" position="replace">
+                    <filter string="Upcoming Evaluation" name="next_appraisal"
+                            domain="[('next_appraisal_date', '&lt;', (context_today() + relativedelta(days=90)).strftime('%Y-%m-%d'))]"/>
+                </xpath>
+                <xpath expr="//filter[@name='group_next_appraisal']" position="replace">
+                    <filter name="group_next_appraisal" string="Next Evaluation" domain="[]"
+                            context="{'group_by': 'next_appraisal_date'}"/>
+                </xpath>
+            </field>
+        </record>
+
         <record id="hr_kanban_inherited" model="ir.ui.view">
             <field name="name">hr_kanban_inherited</field>
             <field name="model">hr.employee</field>
@@ -73,23 +75,19 @@
             </field>
         </record>
 
-
-        <record id="hr_department_kanban_inherited" model="ir.ui.view">
-            <field name="name">hr_department_kanban_inherited</field>
+        <record id="inherit_hr_department_hierarchy_view" model="ir.ui.view">
+            <field name="name">inherit.hr.department.view.hierarchy</field>
             <field name="model">hr.department</field>
-            <field name="inherit_id" ref="hr.hr_department_view_kanban"/>
+            <field name="inherit_id" ref="hr_org_chart.hr_department_hierarchy_view"/>
             <field name="arch" type="xml">
-                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="attributes">
-                    <attribute name="invisible">1</attribute>
-                </xpath>
-                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="after">
-                    <button class="btn btn-primary" name='%(hr.act_employee_from_department)d' type="action">
-                        <t t-out="record.total_employee.raw_value"/>
-                        Members
-                    </button>
+                <!-- Locate the button containing the "Employees" text and replace it with "Members" -->
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']/t" position="replace">
+                    <t t-out="record.total_employee.raw_value"/>
+                    Members
                 </xpath>
             </field>
         </record>
+
 
         <record id="hr_employee_skills_tree_inherited" model="ir.ui.view">
             <field name="name">hr_employee_skills_tree_inherited</field>
@@ -194,23 +192,6 @@
         </record>
 
 
-        <!--        &lt;!&ndash; Inherit the original applicant_hired_template to create a new template for member creation &ndash;&gt;-->
-        <!--        <template id="member_created_template" inherit_id="applicant_hired_template">-->
-        <!--            <xpath expr="//t[text()='Employee created:']" position="replace">-->
-        <!--                Member created:-->
-        <!--                <a href="#" t-att-data-oe-id="member.id" data-oe-model="your.member.model">-->
-        <!--                    <t t-esc="member.name"/>-->
-        <!--                </a>-->
-        <!--            </xpath>-->
-        <!--        </template>-->
-
-        <!--        &lt;!&ndash; Modify the mail notification template to adjust the background color &ndash;&gt;-->
-        <!--        <template id="mail_notification_light_without_background" inherit_id="mail.mail_notification_light">-->
-        <!--            <xpath expr="//t//table[@role='presentation']" position="attributes">-->
-        <!--                <attribute name="style" add="background-color: white;" separator=" "/>-->
-        <!--            </xpath>-->
-        <!--        </template>-->
-
         <record id="view_partner_form_inherit_hide_sales_purchases" model="ir.ui.view">
             <field name="name">view.partner.form.inherit.hide.sales.purchases</field>
             <field name="model">res.partner</field>
@@ -282,6 +263,177 @@
             </field>
         </record>
 
+
+        <record id="hr_department_kanban_action_inherited" model="ir.actions.act_window">
+            <field name="name">Committee</field>
+            <field name="res_model">hr.department</field>
+            <field name="view_mode">kanban,tree,form</field>
+            <!--            <field name="search_view_id" ref="view_department_filter"/>-->
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new Committee
+                </p>
+                <p>
+                    Board fusion's Committee structure is used to manage all documents
+                    related to Members by Committee: expenses, timesheets,
+                    time off, etc.
+                </p>
+            </field>
+        </record>
+
+        <record id="hr_department_tree_action_inherited" model="ir.actions.act_window">
+            <field name="name">Committee</field>
+            <field name="res_model">hr.department</field>
+            <field name="view_mode">tree,form,kanban</field>
+            <!--            <field name="search_view_id" ref="view_department_filter"/>-->
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new Committee
+                </p>
+                <p>
+                    Board fusion's committee structure is used to manage all documents
+                    related to Members by Committee: expenses, timesheets,
+                    leaves, etc.
+                </p>
+            </field>
+        </record>
+
+        <record id="open_view_employee_list_my_inherited" model="ir.actions.act_window">
+            <field name="name">Members</field>
+            <field name="res_model">hr.employee</field>
+            <field name="view_mode">kanban,tree,form,activity,graph,pivot</field>
+            <field name="domain">[]</field>
+            <field name="context">{'chat_icon': True}</field>
+            <field name="view_id" eval="False"/>
+            <field name="search_view_id" ref="view_employee_filter_inherited"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Add a New Member
+                </p>
+                <p>
+                    With just a quick glance on the Board fusion Member screen, you
+                    can easily find all the information you need for each Member;
+                    contact data, availability, etc.
+                </p>
+            </field>
+        </record>
+
+        <record id="view_employee_filter_inherited" model="ir.ui.view">
+            <field name="name">hr.employee.search</field>
+            <field name="model">hr.employee</field>
+            <field name="arch" type="xml">
+                <search>
+                    <filter name="committee_filter" string="Committee Members"
+                            domain="[('committees_ids', '!=', False)]"/>
+                    <filter name="committee_none" string="Non-Committee Members"
+                            domain="[('committees_ids', '=', False)]"/>
+
+                    <group expand="1" string="Committees">
+                        <field name="committees_ids" string="Committees" context="{'group_by': 'committees_ids'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="hr.menu_hr_employee_user" model="ir.ui.menu">
+            <field name="name">Members</field>
+            <field name="action" ref="committee_module.open_view_employee_list_my_inherited"/>
+        </record>
+
+
+        <record id="view_employee_tree_committee" model="ir.ui.view">
+            <field name="name">hr.employee.tree</field>
+            <field name="model">hr.employee</field>
+            <field name="arch" type="xml">
+                <tree string="Employees" expand="context.get('expand', False)" multi_edit="1" sample="1"
+                      js_class="hr_employee_list">
+                    <field name="name" readonly="1"/>
+                    <field name="work_phone" class="o_force_ltr" readonly="1" optional="show"/>
+                    <field name="work_email"/>
+                    <field name="committees_ids" widget="many2many_tags"
+                           options="{'no_create_edit': True, 'count': True}"/>
+                    <field name="activity_ids" widget="list_activity" optional="show"/>
+                    <field name="activity_user_id" optional="hide" string="Activity by" widget="many2one_avatar_user"/>
+                    <field name="activity_date_deadline" widget="remaining_days" options="{'allow_order': '1'}"
+                           optional="show"/>
+                    <field name="company_id" groups="base.group_multi_company" readonly="1" optional="show"/>
+                    <field name="parent_id" widget="many2one_avatar_user" optional="show"
+                           groups="base.group_multi_company"/>
+                </tree>
+            </field>
+        </record>
+
+
+        <record id="view_employee_filter_inherited" model="ir.ui.view">
+            <field name="name">hr.employee.search</field>
+            <field name="model">hr.employee</field>
+            <field name="arch" type="xml">
+                <search>
+                    <filter name="committee_filter" string="Committee Members"
+                            domain="[('committees_ids', '!=', False)]"/>
+                    <filter name="committee_none" string="Non-Committee Members"
+                            domain="[('committees_ids', '=', False)]"/>
+
+
+                    <group expand="context.get('expand', False)"
+                           string="Committees">
+                        <field name="committees_ids" string="Committees" context="{'group_by': 'committees_ids'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+
+        <record id="act_employee_from_department_inherited" model="ir.actions.act_window">
+            <field name="name">Members</field>
+            <field name="res_model">hr.employee</field>
+            <field name="view_mode">tree,kanban,form</field>
+            <field name="search_view_id" ref="view_employee_filter_inherited"/>
+            <field name="context">{
+                'group_by': 'committees_ids',
+                'default_committees_ids': active_id,
+                'search_default_committee_filter': 1,
+                'expand': 1
+                }
+            </field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Add a New Member
+                </p>
+                <p>
+                    With just a quick glance on the Board Member screen, you
+                    can easily find all the information you need for each person;
+                    contact data, availability, etc.
+                </p>
+            </field>
+        </record>
+
+
+        <record id="hr_department_kanban_inherited" model="ir.ui.view">
+            <field name="name">hr_department_kanban_inherited</field>
+            <field name="model">hr.department</field>
+            <field name="inherit_id" ref="hr.hr_department_view_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='%(hr.act_employee_from_department)d']" position="after">
+                    <button class="btn btn-primary" name="%(act_employee_from_department_inherited)d" type="action">
+                        <t t-out="record.total_employee.raw_value"/>
+                        Members
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr.open_view_employee_tree" model="ir.actions.act_window">
+            <field name="name">Members Structure</field>
+            <field name="res_model">hr.employee</field>
+            <field name="view_mode">tree,form</field>
+            <field name="view_id" ref="committee_module.view_employee_tree_committee"/>
+            <field name="domain">[('parent_id','=',False)]</field>
+            <field name="search_view_id" ref="view_employee_filter_inherited"/>
+        </record>
 
     </data>
 </odoo>
