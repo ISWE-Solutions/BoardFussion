@@ -27,7 +27,7 @@
                 <!-- Locate the button containing the "Employees" text and replace it with "Members" -->
                 <xpath expr="//button[@name='%(hr.act_employee_from_department)d']/t" position="replace">
                     <t t-out="record.total_employee.raw_value"/>
-                    Members
+                    Members 
                 </xpath>
             </field>
         </record>
