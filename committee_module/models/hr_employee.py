@@ -99,7 +99,6 @@ class HrEmployee(models.Model):
                     print(f"No archived partners currently linked to employee {employee.name} in employee_ids.")
 
 
-    @api.model
     def unlink(self):
         for employee in self:
             if employee.active:
@@ -119,8 +118,7 @@ class HrEmployee(models.Model):
                     ('active', '=', True)  # Only consider active partners for archiving
                 ])
                 if partners:
-                    print(
-                        f"Found active partners related to employee {employee.name}: {[partner.name for partner in partners]}")
+                    print(f"Found active partners related to employee {employee.name}: {[partner.name for partner in partners]}")
                     partners.write({'active': False})  # Deactivate partners
                     print(f"Archived {len(partners)} partner(s) related to employee {employee.name}")
                 else:
@@ -128,6 +126,7 @@ class HrEmployee(models.Model):
 
         # Call the super method to actually unlink the employees after archiving related records
         return super(HrEmployee, self).unlink()
+
 
     @api.model_create_multi
     def create(self, vals_list):
