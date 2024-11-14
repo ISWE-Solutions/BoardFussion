@@ -19,8 +19,8 @@
                             <field name="is_user_restricted" invisible="1" />
                             <field name="pdf_attachment" widget="many2many_binary"
                                    groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary" placeholder="Attachments" invisible="is_user_restricted, '=', False" />
-                             <field name="Restricted" widget="many2many_tags"
-                               groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+<!--                             <field name="Restricted" widget="many2many_tags"-->
+<!--                               groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
                         </group>
                     </div>
                 </sheet>
