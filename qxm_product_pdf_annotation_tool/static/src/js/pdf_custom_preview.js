@@ -47,6 +47,7 @@ class PDFCustomPreview extends Component {
 
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 await this.renderPDFPage(pdf, pageNum, pdfContainer, pageList);
+                
             }
             this.onScrollPage();
         } catch (reason) {
@@ -87,6 +88,8 @@ class PDFCustomPreview extends Component {
         console.log('Page rendered');
 
         this.initializeMarkers(pageNum, canvasWrapper, canvas);
+        this.initializeHighlightMarkers(pageNum, canvasWrapper, canvas);
+        this.initializeCanvas(pageNum, canvasWrapper, canvas);
     }
 
     createPageDiv(pageNum) {
@@ -156,18 +159,60 @@ class PDFCustomPreview extends Component {
 //            this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
 //        });
 
-        // const lines = this.data.lines[pageNum] || [];
-        // for (const line of lines) {
-        //     line_count += 1;
-        //     this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
-        // }
-
-        // After Highlighting Edition..
         const lines = this.data.lines[pageNum] || [];
         for (const line of lines) {
             line_count += 1;
-            this.createMarkerDOM(line.layerx, line.layery, line.height, line.width, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
+            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
         }
+    }
+
+    initializeHighlightMarkers(pageNum, canvasWrapper, canvas) {
+        let marker_count = 0;
+
+        const highlightMarkers = this.data.highlighted_marks[pageNum] || [];
+        for (const marker of highlightMarkers) {
+            marker_count += 1;
+            this.createHighlighterDOM(marker.layerx, marker.layery, marker.height, marker.width || "", marker.id, canvasWrapper, pageNum, marker_count);
+        }
+    }
+
+    initializeCanvas(pageNum, canvasWrapper, canvas){
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 3;
+        const drawings = this.data.drawing[pageNum] || [];
+        console.log('Drawings LOaded',drawings);
+        for (const drawing of drawings) {
+            const drawingData = JSON.parse(drawing.drawing_data);
+            drawingData.forEach(data => {
+                ctx.beginPath();
+                ctx.moveTo(data[0].x, data[0].y);
+                data.forEach(point => {
+                    ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            });
+        }
+    }
+
+    createHighlighterDOM(x, y, height, width, highlighter_marker_id,canvasWrapper, pageNum, marker_count) {
+        const hihglighterDiv = this.createHighlighterDiv(x, y, highlighter_marker_id, width, height );
+        canvasWrapper.appendChild(hihglighterDiv);
+        // this.removeHighlighterMarkerDiv(hihglighterDiv, highlighter_marker_id);
+                                               
+    }
+
+    createHighlighterDiv(x, y, highlighter_marker_id, width, height) {
+        const highlightDiv = document.createElement('div');
+        highlightDiv.style.position = 'absolute';
+        highlightDiv.style.left = `${x}px`;
+        highlightDiv.style.top = `${y}px`;
+        highlightDiv.style.width = `${width}px`;
+        highlightDiv.style.height = `${height}px`;
+        highlightDiv.style.backgroundColor = 'yellow';
+        highlightDiv.style.opacity = '0.5';
+        highlightDiv.id = `marker_${highlighter_marker_id}`;
+        highlightDiv.classList.add('text_highlight');
+        return highlightDiv;
     }
 
 //    getCanvasClickPosition(event, canvas) {
@@ -177,41 +222,18 @@ class PDFCustomPreview extends Component {
 //        return { x, y };
 //    }
 
-    // OLD BEFORE HIGHLIGHT
-    // createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
-    //     console.log(user,'test');
-    //     const markerDiv = this.createMarkerDiv(x, y, line_id);
-    //     canvasWrapper.appendChild(markerDiv);
-
-    //     const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
-    //     this.table_tbody.el.appendChild(newTableRow);
-
-    //     this.makeDraggable(markerDiv, line_id);
-    // }
-
-    createMarkerDOM(x, y, height, width, description, line_id,user, canvasWrapper, pageNum, line_count) {
+    createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
         console.log(user,'test');
-        const markerDiv = this.createMarkerDiv(x, y, line_id, width, height );
+        const markerDiv = this.createMarkerDiv(x, y, line_id);
         canvasWrapper.appendChild(markerDiv);
+
         const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
         this.table_tbody.el.appendChild(newTableRow);
-        this.makeDraggable(markerDiv, line_id);
-                                               
+
+        // this.makeDraggable(markerDiv, line_id); nOT IN READING VIEW
     }
 
-    createMarkerDiv(x, y, line_id, width, height) {
-        const markerDiv = document.createElement('div');
-        markerDiv.style.position = 'absolute';
-        markerDiv.style.left = `${x}px`;
-        markerDiv.style.top = `${y}px`;
-        markerDiv.style.width = `${width}px`;
-        markerDiv.style.height = `${height}px`;
-        markerDiv.style.backgroundColor = 'yellow';
-        markerDiv.style.opacity = '0.5';
-        markerDiv.id = `marker_${line_id}`;
-        return markerDiv;
-    }
-    // OLD BEFORE HIGHLIGHT
+    // OLD MARKER DIV FOR ANNOTATION
     // createMarkerDiv(x, y, line_id) {
     //     const markerDiv = document.createElement('div');
     //     markerDiv.style.left = `${x}px`;
@@ -220,6 +242,25 @@ class PDFCustomPreview extends Component {
     //     markerDiv.classList.add('img_marker');
     //     return markerDiv;
     // }
+
+    createMarkerDiv(x, y, line_id) {
+        const markerDiv = document.createElement('div');
+        markerDiv.style.position = 'absolute'; // Ensure absolute positioning
+        markerDiv.style.left = `${x}px`;
+        markerDiv.style.top = `${y}px`;
+        markerDiv.id = `marker_${line_id}`;
+        markerDiv.classList.add('marker');
+
+        // Create the Font Awesome icon element
+        const icon = document.createElement('i');
+        icon.classList.add('fa', 'fa-commenting');
+        icon.style.color = 'red'; // Set the color of the icon
+        icon.style.fontSize = '24px'; // Set the size of the icon
+
+        // Append the icon to the markerDiv
+        markerDiv.appendChild(icon);
+        return markerDiv;
+    }
 
     async createLine(x, y, page_no) {
         const [line_id] = await this.orm.create("product.pdf.annotation.line", [{
@@ -296,14 +337,43 @@ class PDFCustomPreview extends Component {
         }
     }
 
-    createTableRow(rowId, description,user, pageNumber, lineNumber, markerDiv) {
+//     createTableRow(rowId, description,user, pageNumber, lineNumber, markerDiv) {
+//         const tr = document.createElement('tr');
+//         tr.id = `table_line_${rowId}`;
+//         tr.className = 'table_tr_line';
+//         tr.innerHTML = `
+//             <th scope="row"><span>${pageNumber}</span></th>
+//             <th scope="row"><span>${user}</span></th>
+//             <td><span>${description}</span></td>
+//         `;
+
+//         tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
+//         tr.onmouseout = () => this.removeHoverEffect();
+//         tr.onclick = () => this.scrollToElement(markerDiv);
+
+//         markerDiv.onmouseover = () => this.addHoverEffect(markerDiv, tr);
+//         markerDiv.onmouseout = () => this.removeHoverEffect();
+//         markerDiv.onclick = () => this.scrollToElement(tr);
+
+// //        this.initializeDeleteMarker(tr, markerDiv, rowId);
+// //        this.initializeSaveMarker(tr, rowId);
+
+//         return tr;
+//     }
+
+    createTableRow(rowId, description, user, pageNumber, lineNumber, markerDiv) {
         const tr = document.createElement('tr');
         tr.id = `table_line_${rowId}`;
         tr.className = 'table_tr_line';
         tr.innerHTML = `
-            <th scope="row"><span>${pageNumber}</span></th>
-            <th scope="row"><span>${user}</span></th>
-            <td><span>${description}</span></td>
+            <td>
+                <div class="annotation-details">
+                    <div><strong>Page:</strong> <span>${pageNumber}</span></div>
+                    <div><strong>User:</strong> <span>${user}</span></div>
+                    <div><strong>Comment:</strong></div>
+                    <div><span>${description}</span></div>
+                </div>
+            </td>
         `;
 
         tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
@@ -314,8 +384,8 @@ class PDFCustomPreview extends Component {
         markerDiv.onmouseout = () => this.removeHoverEffect();
         markerDiv.onclick = () => this.scrollToElement(tr);
 
-//        this.initializeDeleteMarker(tr, markerDiv, rowId);
-//        this.initializeSaveMarker(tr, rowId);
+        // this.initializeDeleteMarker(tr, markerDiv, rowId);
+        // this.initializeSaveMarker(tr, rowId);
 
         return tr;
     }
@@ -331,7 +401,7 @@ class PDFCustomPreview extends Component {
     }
 
     scrollToElement(element) {
-        const container = document.getElementById(element.classList.contains('img_marker') ? 'pdf-container' : 'description_container');
+        const container = document.getElementById(element.classList.contains('marker') ? 'pdf-container' : 'description_container');
         const containerRect = container.getBoundingClientRect();
         const elementRect = element.getBoundingClientRect();
 

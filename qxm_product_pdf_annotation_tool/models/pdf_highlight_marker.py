@@ -1,8 +1,8 @@
 from odoo import models, fields
 
-class ProductPDFAnnotationHighlight(models.Model):
-    _name = 'product.pdf.annotation.highlight'
-    _description = 'PDF Annotation Highlight'
+class PdfHighlightMarker(models.Model):
+    _name = 'pdf.highlight.marker'
+    _description = 'PDF Highlight Marker'
 
     page_no = fields.Char('Page Number')
     layerx = fields.Char('X Position')
@@ -11,4 +11,3 @@ class ProductPDFAnnotationHighlight(models.Model):
     height = fields.Char('Height')
     user_id = fields.Many2one('res.users', string='User', default=lambda self: self.env.user)
     document_id = fields.Many2one('product.document', 'Document')
-    ir_document_id = fields.Many2one('ir.attachment', 'Document')

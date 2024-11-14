@@ -17,11 +17,14 @@ class ProductPDFAnnotation extends Component {
             controlPanel: {},
             searchPanel: false,
         };
-        this.active_id = this.props.action.context.active_id;
+        this.highlightMode = false;
         this.annotateMode = false;
+        this.draw = false;
+        this.active_id = this.props.action.context.active_id;
 
         onWillStart(this.fetchDocumentData.bind(this));
         onMounted(this.initializePDF.bind(this));
+        // onMounted(this.initializeCanvas.bind(this));
     }
 
     async fetchDocumentData() {
@@ -65,84 +68,33 @@ class ProductPDFAnnotation extends Component {
         return bytes;
     }
 
-    // async renderPDFPage(pdf, pageNum, pdfContainer, pageList) {
-    //     const page = await pdf.getPage(pageNum);
-    //     console.log('Page loaded');
-
-    //     const scale = 1.3;
-    //     const viewport = page.getViewport({ scale });
-    //     const pageDiv = this.createPageDiv(pageNum);
-    //     const canvasWrapper = this.createCanvasWrapper();
-    //     const canvas = this.createCanvas(viewport);
-
-    //     canvasWrapper.appendChild(canvas);
-    //     pageDiv.appendChild(canvasWrapper);
-    //     pdfContainer.appendChild(pageDiv);
-
-    //     const pagerCanvasWrapper = await this.createPagerCanvasWrapper(page, pageNum, pageDiv, pdfContainer);
-    //     pageList.appendChild(pagerCanvasWrapper);
-
-    //     const context = canvas.getContext('2d');
-    //     const renderContext = { canvasContext: context, viewport };
-    //     await page.render(renderContext).promise;
-    //     console.log('Page rendered');
-
-    //     this.initializeMarkers(pageNum, canvasWrapper, canvas);
-    // }
-
     async renderPDFPage(pdf, pageNum, pdfContainer, pageList) {
         const page = await pdf.getPage(pageNum);
+        console.log('Page loaded');
+
         const scale = 1.3;
         const viewport = page.getViewport({ scale });
         const pageDiv = this.createPageDiv(pageNum);
         const canvasWrapper = this.createCanvasWrapper();
         const canvas = this.createCanvas(viewport);
-    
+
         canvasWrapper.appendChild(canvas);
         pageDiv.appendChild(canvasWrapper);
         pdfContainer.appendChild(pageDiv);
-    
+
+        const pagerCanvasWrapper = await this.createPagerCanvasWrapper(page, pageNum, pageDiv, pdfContainer);
+        pageList.appendChild(pagerCanvasWrapper);
+
         const context = canvas.getContext('2d');
         const renderContext = { canvasContext: context, viewport };
         await page.render(renderContext).promise;
-    
-        // Add the text selection listener after rendering the PDF page
-        // this.addTextSelectionListener(canvas, pageNum);
-    
+        console.log('Page rendered');
+
         this.initializeMarkers(pageNum, canvasWrapper, canvas);
+        this.initializeHighlightMarkers(pageNum, canvasWrapper, canvas);
+        this.initializeCanvas(pageNum, canvasWrapper, canvas);
+        this.initializeUndo(pageNum, canvasWrapper, canvas);  
     }
-
-    // addTextSelectionListener(canvas, pageNum) {
-    //     canvas.addEventListener('mouseup', (event) => {
-    //         const selection = window.getSelection();
-    //         const selectedText = selection.toString();
-    
-    //         if (selectedText) {
-    //             const range = selection.getRangeAt(0);
-    //             const { startOffset, endOffset } = range;
-    
-    //             // Compute bounding box for the selected text and highlight it
-    //             const selectedBoxes = this.getSelectedTextBoundingBoxes(range);
-    
-    //             this.highlightText(selectedBoxes, pageNum);
-    //         }
-    //     });
-    // }
-
-
-
-    createTextLayer(textContent, viewport) {
-        const textLayerDiv = document.createElement('div');
-        textLayerDiv.classList.add('textLayer');
-        pdfjsLib.renderTextLayer({
-            textContent: textContent,
-            container: textLayerDiv,
-            viewport: viewport,
-            textDivs: [],
-        });
-        return textLayerDiv;
-    }    
-    
 
     createPageDiv(pageNum) {
         const pageDiv = document.createElement('div');
@@ -190,117 +142,158 @@ class ProductPDFAnnotation extends Component {
         return pagerCanvasWrapper;
     }
 
-    // initializeHighlightMode(pageNum, canvasWrapper, canvas) {
-    
-    //     // Toggle highlight mode
-    //     document.getElementById('highlightIcon').addEventListener('click', () => {
-    //         console.log(this.highlightMode);
-    //         this.highlightMode = !this.highlightMode;
-    //         console.log(this.highlightMode);
-    //         if (this.highlightMode == true) {
-    //             document.getElementById('highlightIcon').classList.add('active');
-    //             // console.log('Highlight icon activated');
-    //         } else {
-    //             document.getElementById('highlightIcon').classList.remove('active');
-    //             // console.log('Highlight icon deactivated');
-    //         }
-    //     });
-    
-    //     // canvas.addEventListener('click', event => {
-    //     //     if (this.highlightMode) {
-    //     //         const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //     //         // Example dimensions for the highlight area
-    //     //         const width = 100;
-    //     //         const height = 20;
-    //     //         this.highlightText(x, y, width, height, canvasWrapper, pageNum);
-    //     //     }
-    //     // });
+    initializeMarkers(pageNum, canvasWrapper, canvas) {
+        let line_count = 0;
 
-    //     let isHighlighting = false;
-    //     let startX, startY, highlightDiv;
-
-    //     canvas.addEventListener('mousedown', (event) => {
-    //         if (this.highlightMode && event.button === 0) { // Right mouse button
-    //             isHighlighting = true;
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             startX = x;
-    //             startY = y;
-    //             highlightDiv = this.createHighlightDiv(x, y, 0, 0);
-    //             canvasWrapper.appendChild(highlightDiv);
-    //             event.preventDefault(); // Prevent context menu
-    //         }
-    //     });
-
-    //     canvas.addEventListener('mousemove', (event) => {
-    //         if (isHighlighting) {
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             const width = x - startX;
-    //             const height = y - startY;
-    //             highlightDiv.style.width = `${width}px`;
-    //             highlightDiv.style.height = `${height}px`;
-    //         }
-    //     });
-
-    //     canvas.addEventListener('mouseup', (event) => {
-    //         if (isHighlighting && event.button === 0) { // Right mouse button
-    //             isHighlighting = false;
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             const width = x - startX;
-    //             const height = y - startY;
-    //             this.highlightText(startX, startY, width, height, canvasWrapper, pageNum);
-    //         }
-    //     });
-
-    //     // Prevent context menu on right click
-    //     canvas.addEventListener('contextmenu', (event) => {
-    //         if (this.highlightMode) {
-    //             event.preventDefault();
-    //         }
-    //     });
-    // }
-
-    initializeHighlightMode(pageNum, canvasWrapper, canvas) {
-        // Ensure the highlight icon exists
         const highlightIcon = document.getElementById('highlightIcon');
         if (!highlightIcon) {
             console.error('Highlight icon not found');
             return;
         }
-    
-        // Check if the event listener is already attached
-        if (!highlightIcon.dataset.listenerAttached) {
-            highlightIcon.addEventListener('click', () => {
-                console.log('Highlight button clicked');
-                this.highlightMode = !this.highlightMode;
-                console.log('Highlight mode:', this.highlightMode);
-                if (this.highlightMode) {
-                    highlightIcon.classList.add('active');
-                    console.log('Highlight icon activated');
-                } else {
-                    highlightIcon.classList.remove('active');
-                    console.log('Highlight icon deactivated');
-                }
-            });
-            highlightIcon.dataset.listenerAttached = 'true';
+
+        const annotateIcon = document.getElementById('annotateIcon');
+        if (!annotateIcon) {
+            console.error('Annotate icon not found');
+            return;
         }
-    
-        let isHighlighting = false;
+
+        const drawIcon = document.getElementById('drawIcon');
+        if (!drawIcon) {
+            console.error('Draw icon not found');
+            return;
+        }
+
+
+        if (!annotateIcon.dataset.listenerAttached) {
+            annotateIcon.addEventListener('click', () => {
+            this.annotateMode = !this.annotateMode;
+            this.highlightMode = false;
+            this.draw = false;
+            highlightIcon.classList.remove('active');
+            drawIcon.classList.remove('active');
+            console.log('Annotate Mode Activated:',this.annotateMode)
+            if (this.annotateMode) {
+                annotateIcon.classList.add('active');
+                console.log('Annotate button activated');
+                console.log('Global Highlight Mode:',this.annotateMode)
+            } else {
+                annotateIcon.classList.remove('active');
+                drawIcon.classList.remove('active');
+                console.log('Annotate icon deactivated');
+                console.log('Global Highlight Mode:',this.annotateMode)
+            }
+        });
+        annotateIcon.dataset.listenerAttached = 'true';
+    }
+
+        
+            canvas.addEventListener('click', async event => {
+                if (this.highlightMode == true || this.annotateMode == false || this.draw == true) {return}
+                line_count += 1;
+                console.log('Mode:',this.highlightMode)
+                const { x, y } = this.getCanvasClickPosition(event, canvas);
+                const line_id = await this.createLine(x, y, pageNum);
+                console.log('Line created', line_id);
+                const line_data = await this.orm.searchRead(
+                    "product.pdf.annotation.line",
+                    [
+                      ["id", "=", line_id],
+                    ],
+                    ["user_id"]
+                  );
+                console.log(line_data);
+                const user_name= line_data[0].user_id[1];
+                // console.log(user_name);
+                this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
+            });
+        
+
+        const lines = this.data.lines[pageNum] || [];
+        for (const line of lines) {
+            line_count += 1;
+            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
+        }
+    }
+
+    initializeHighlightMarkers(pageNum, canvasWrapper, canvas) {
+        let marker_count=0;
+        let highlight = false;
+        let isDrawing = false; 
         let startX, startY, highlightDiv;
-    
-        canvas.addEventListener('mousedown', (event) => {
-            if (this.highlightMode && event.button === 0) { // Left mouse button
-                isHighlighting = true;
+        let highlighterId = 0;
+
+        const annotateIcon = document.getElementById('annotateIcon');
+        if (!annotateIcon) {
+            console.error('Annotate icon not found');
+            return;
+        }
+
+        const highlightIcon = document.getElementById('highlightIcon');
+        if (!highlightIcon) {
+            console.error('Highlight icon not found');
+            return;
+        }
+
+        const drawIcon = document.getElementById('drawIcon');
+        if (!drawIcon) {
+            console.error('Draw icon not found');
+            return;
+        }
+
+        if (!highlightIcon.dataset.listenerAttached) {
+        highlightIcon.addEventListener('click', () => {
+            highlight = !highlight
+            this.highlightMode =  !this.highlightMode;
+            this.annotateMode = false;
+            this.draw = false;
+            annotateIcon.classList.remove('active');
+            drawIcon.classList.remove('active');
+            console.log('Highlight Mode:',this.highlightMode)
+            if (this.highlightMode) {
+                highlightIcon.classList.add('active');
+                console.log('Highlight button activated');
+                console.log('Global Highlight Mode:',this.highlightMode)
+            } else {
+                highlightIcon.classList.remove('active');
+                drawIcon.classList.remove('active');
+                console.log('Highlight icon deactivated');
+                console.log('Global Highlight Mode:',this.highlightMode)
+            }
+        });
+        highlightIcon.dataset.listenerAttached = 'true';
+    }
+
+        canvas.addEventListener('mousedown', async event => {
+            if (this.highlightMode && event.button === 0) {
                 const { x, y } = this.getCanvasClickPosition(event, canvas);
                 startX = x;
                 startY = y;
-                highlightDiv = this.createHighlightDiv(x, y, 0, 0);
+                isDrawing = true;
+
+                // Create a new highlight marker in the backend
+                const highlighter_marker_id = await this.createHighlightMarker(x, y, pageNum);
+                console.log('Highlight Marker created', highlighter_marker_id);
+
+                const highlighter_marker_data = await this.orm.searchRead(
+                    "pdf.highlight.marker",
+                    [
+                        ["id", "=", highlighter_marker_id],
+                    ],
+                    ["user_id"]
+                );
+
+                // Storing the ID of the record created
+                highlighterId = highlighter_marker_data[0].id;
+
+                // Create the highlight marker
+                highlightDiv = this.createHighlighterDiv(x, y, highlighter_marker_id);
                 canvasWrapper.appendChild(highlightDiv);
-                event.preventDefault(); // Prevent default behavior
+
             }
         });
-    
-        canvas.addEventListener('mousemove', (event) => {
-            if (isHighlighting) {
+
+        canvas.addEventListener('mousemove', event => {
+            if (isDrawing && highlightDiv) {
                 const { x, y } = this.getCanvasClickPosition(event, canvas);
                 const width = x - startX;
                 const height = y - startY;
@@ -308,314 +301,91 @@ class ProductPDFAnnotation extends Component {
                 highlightDiv.style.height = `${height}px`;
             }
         });
-    
-        canvas.addEventListener('mouseup', (event) => {
-            if (isHighlighting && event.button === 0) { // Left mouse button
-                isHighlighting = false;
-                const { x, y } = this.getCanvasClickPosition(event, canvas);
-                const width = x - startX;
-                const height = y - startY;
-                this.highlightText(startX, startY, width, height, canvasWrapper, pageNum);
-            }
-        });
-    
-        // Prevent context menu on right click
-        canvas.addEventListener('contextmenu', (event) => {
-            if (this.highlightMode) {
-                event.preventDefault();
-            }
-        });
-    }
 
-    highlightText(x, y, width, height, canvasWrapper, pageNum) {
-        const highlightDiv = this.createHighlightDiv(x, y, width, height);
-        canvasWrapper.appendChild(highlightDiv);
-        // this.makeHighlighterDraggable(highlightDiv, highlightDiv.id);
-        this.saveHighlightData(x, y, width, height, pageNum, highlightDiv.id);
-    }
-
-    saveHighlightData(x, y, width, height, pageNum, highlightId) {
-        // Save the highlight data to the backend
-        this.orm.create("product.pdf.annotation.highlight", [{
-            page_no: pageNum,
-            layerx: x,
-            layery: y,
-            width: width,
-            height: height,
-            document_id: this.active_id,
-        }]).then((ids) => {
-            highlightId = ids[0];
-            this.globalhighlight_id = ids[0];
-            console.log('Highlight created', highlightId);
-        });
-    }
-    
-    createHighlightDiv(x, y, width, height) {
-        const highlightDiv = document.createElement('div');
-        highlightDiv.style.position = 'absolute';
-        highlightDiv.style.left = `${x}px`;
-        highlightDiv.style.top = `${y}px`;
-        highlightDiv.style.width = `${width}px`;
-        highlightDiv.style.height = `${height}px`;
-        highlightDiv.style.backgroundColor = 'yellow';
-        highlightDiv.style.opacity = '0.5';
-        highlightDiv.classList.add('text_highlight', 'draggable');
-        console.log('div id',highlightDiv.id);
-
-        // Add delete button
-        // const deleteButton = document.createElement('button');
-        // deleteButton.innerText = 'Delete';
-        // deleteButton.classList.add('delete_button');
-        // deleteButton.onclick = () => this.deleteHighlight(highlightDiv);
-        // highlightDiv.appendChild(deleteButton);
-
-        return highlightDiv;
-    }
-
-    deleteHighlight(highlightDiv) {
-        const highlightId = highlightDiv.id;
-        highlightDiv.remove();
-        this.orm.unlink("product.pdf.annotation.highlight", [this.globalhighlight_id]);
-    }
-
-    // initializeMarkers(pageNum, canvasWrapper, canvas) {
-    //     let line_count = 0;
-
-    //     canvas.addEventListener('click', async event => {
-    //         const { x, y } = this.getCanvasClickPosition(event, canvas);
-    
-    //         if (!this.highlightMode) {
-    //             line_count += 1;
-    //             const line_id = await this.createLine(x, y, pageNum);
-    //             console.log('Line created', line_id);
-    //             const line_data = await this.orm.searchRead(
-    //                 "product.pdf.annotation.line",
-    //                 [
-    //                   ["id", "=", line_id],
-    //                 ],
-    //                 ["user_id"]
-    //               );
-    //             console.log(line_data);
-    //             const user_name= line_data[0].user_id[1];
-    //             this.createMarkerDOM(x, y, "", line_id, user_name, canvasWrapper, pageNum, line_count);
-    //         }
-    //     });
-    
-    //     const lines = this.data.lines[pageNum] || [];
-    //     for (const line of lines) {
-    //         line_count += 1;
-    //         this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
-    //     }
-    
-    //     this.initializeHighlightMode(pageNum, canvasWrapper, canvas);
-    //     this.loadHighlightData(pageNum, canvasWrapper);
-    // }
-
-    // OLD BASIC
-    // initializeMarkers(pageNum, canvasWrapper, canvas) {
-    //     let line_count = 0;
-
-    //     canvas.addEventListener('click', async event => {
-    //         const { x, y } = this.getCanvasClickPosition(event, canvas);
-    
-    //         if (!this.highlightMode) {
-    //             line_count += 1;
-    //             const line_id = await this.createLine(x, y, pageNum);
-    //             console.log('Line created', line_id);
-    //             const line_data = await this.orm.searchRead(
-    //                 "product.pdf.annotation.line",
-    //                 [
-    //                   ["id", "=", line_id],
-    //                 ],
-    //                 ["user_id"]
-    //               );
-    //             console.log(line_data);
-    //             const user_name= line_data[0].user_id[1];
-    //             this.createMarkerDOM(x, y, "", line_id, user_name, canvasWrapper, pageNum, line_count);
-    //         }
-    //     });
-    
-    //     const lines = this.data.lines[pageNum] || [];
-    //     for (const line of lines) {
-    //         line_count += 1;
-    //         this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
-    //     }
-    
-    //     this.initializeHighlightMode(pageNum, canvasWrapper, canvas);
-    //     this.loadHighlightData(pageNum, canvasWrapper);
-    // }
-
-    async loadHighlightData(pageNum, canvasWrapper) {
-        const highlights = this.data.highlighted_marks[pageNum] || [];
-        for (const highlight of highlights) {
-            this.highlightText(highlight.layerx, highlight.layery, highlight.width, highlight.height, canvasWrapper);
-        }
-    }
-
-    // WORKING !!!
-    initializeMarkers(pageNum, canvasWrapper, canvas) {
-
-        let line_count = 0;
-        let isDrawing = false;
-        let startX, startY, markerDiv;
-        let record_id=0;
-
-        // Ensure the annotate icon exists
-        const annotateIcon = document.getElementById('annotateIcon');
-        if (!annotateIcon) {
-            console.error('Annotate icon not found');
-            return;
-        }
-
-        // Check if the event listener is already attached
-        if (!annotateIcon.dataset.listenerAttached) {
-            annotateIcon.addEventListener('click', () => {
-                console.log('Annotate button clicked');
-                this.annotateMode = !this.annotateMode;
-                console.log('Annotate mode:', this.annotateMode);
-                if (this.annotateMode) {
-                    annotateIcon.classList.add('active');
-                    console.log('Annotate icon activated');
-                    // this.enableAnnotation(canvas, canvasWrapper, pageNum);
-                } else {
-                    annotateIcon.classList.remove('active');
-                    console.log('Annotate icon deactivated');
-                    // this.disableAnnotation(canvas);
-                }
-            });
-            annotateIcon.dataset.listenerAttached = 'true';
-        }
-    
-        // // Check if the event listener is already attached
-        // if (!annotateIcon.dataset.listenerAttached) {
-        //     annotateIcon.addEventListener('click', () => {
-        //         console.log('Annotate button clicked');
-        //         console.log('Annotate Mode',this.annotateMode);
-        //         this.annotateMode = !this.annotateMode;
-        //         console.log('Annotate mode:', this.annotateMode);
-        //         if (this.annotateIcon) {
-        //             annotateIcon.classList.add('active');
-        //             console.log('Annotate icon activated');
-        //         } else {
-        //             annotateIcon.classList.remove('active');
-        //             console.log('Annotate icon deactivated');
-        //         }
-        //     });
-        //     annotateIcon.dataset.listenerAttached = 'true';
-        // }
-
-        canvas.addEventListener('mousedown', async event => {
-            if (this.annotateMode && event.button === 0) {
-                const { x, y } = this.getCanvasClickPosition(event, canvas);
-                startX = x;
-                startY = y;
-                isDrawing = true;
-                console.log('X',x);
-                console.log('Y',y);
-                
-                // Create a new line in the backend
-                const line_id = await this.createLine(x, y, pageNum);
-                console.log('Line created', line_id);
-
-                const line_data = await this.orm.searchRead(
-                    "product.pdf.annotation.line",
-                    [
-                        ["id", "=", line_id],
-                    ],
-                    ["user_id"]
-                );
-
-                console.log('ZEROO',line_data);
-                console.log('IDDD',line_data[0].id);
-                record_id = line_data[0].id;
-                const user_name = line_data[0].user_id[1];
-        
-                // Create the marker div
-                markerDiv = this.createMarkerDiv(x, y, line_id);
-                canvasWrapper.appendChild(markerDiv);
-        
-                // Create the table row
-                const newTableRow = this.createTableRow(line_id, "", user_name, pageNum, line_count, markerDiv);
-                this.table_tbody.el.appendChild(newTableRow);
-        
-                // Make the marker draggable
-                this.makeDraggable(markerDiv, line_id);
-            }
-
-        });
-    
-        canvas.addEventListener('mousemove', event => {
-            if (isDrawing && markerDiv) {
-                const { x, y } = this.getCanvasClickPosition(event, canvas);
-                const width = x - startX;
-                const height = y - startY;
-                markerDiv.style.width = `${width}px`;
-                markerDiv.style.height = `${height}px`;
-            }
-        });
-    
         canvas.addEventListener('mouseup', event => {
-            if (this.annotateMode && event.button === 0) {
+            if (this.highlightMode && event.button === 0) {
                 isDrawing = false;
                 const { x, y } = this.getCanvasClickPosition(event, canvas);
                 const width = x - startX;
                 const height = y - startY;
-                this.updateLine(record_id, {height: height, width: width});
-                // this.saveHighlightData(startX, startY, width, height, pageNum, markerDiv);
+                this.updateHighlightMarker(highlighterId, {height: height, width: width});
             }
         });
 
-        // Prevent context menu on right click
-        canvas.addEventListener('contextmenu', (event) => {
-            if (this.annotateMode) {
-                event.preventDefault();
-            }
-        });
-    
-        const lines = this.data.lines[pageNum] || [];
-        for (const line of lines) {
-            line_count += 1;
-            this.createMarkerDOM(line.layerx, line.layery, line.height, line.width, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
+        const highlightMarkers = this.data.highlighted_marks[pageNum] || [];
+        for (const marker of highlightMarkers) {
+            marker_count += 1;
+            this.createHighlighterDOM(marker.layerx, marker.layery, marker.height, marker.width || "", marker.id, canvasWrapper, pageNum, marker_count);
         }
     }
 
-    // initializeMarkers(pageNum, canvasWrapper, canvas) {
-    //     // Ensure the annotate icon exists
-    //     const annotateIcon = document.getElementById('annotateIcon');
-    //     if (!annotateIcon) {
-    //         console.error('Annotate icon not found');
-    //         return;
-    //     }
-    
-    //     // Check if the event listener is already attached
-    //     if (!annotateIcon.dataset.listenerAttached) {
-    //         annotateIcon.addEventListener('click', () => {
-    //             console.log('Annotate button clicked');
-    //             this.annotateMode = !this.annotateMode;
-    //             console.log('Annotate mode:', this.annotateMode);
-    //             if (this.annotateMode) {
-    //                 annotateIcon.classList.add('active');
-    //                 console.log('Annotate icon activated');
-    //                 this.enableAnnotation(canvas, canvasWrapper, pageNum);
-    //             } else {
-    //                 annotateIcon.classList.remove('active');
-    //                 console.log('Annotate icon deactivated');
-    //                 this.disableAnnotation(canvas);
-    //             }
-    //         });
-    //         annotateIcon.dataset.listenerAttached = 'true';
-    //     }
-    
-    //     // Initialize existing markers
+    // initializePen(pageNum, canvasWrapper, canvas) {
     //     let line_count = 0;
-    //     const lines = this.data.lines[pageNum] || [];
-    //     for (const line of lines) {
-    //         line_count += 1;
-    //         this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
-    //     }
+    //     let isDrawing = false;
+    //     let startX, startY, penDiv;
+
+    //     // const annotateIcon = document.getElementById('annotateIcon');
+    //     // if (!annotateIcon) {
+    //     //     console.error('Annotate icon not found');
+    //     //     return;
+    //     // }
+
+    //     // const highlightIcon = document.getElementById('highlightIcon');
+    //     // if (!highlightIcon) {
+    //     //     console.error('Highlight icon not found');
+    //     //     return;
+    //     // }
+
+    //     canvas.addEventListener('mousedown', async event => {
+    //         if (event.button === 0) {
+    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
+    //             startX = x;
+    //             startY = y;
+    //             isDrawing = true;
+
+    //             // Create a new line in the backend
+    //             // lineId = await this.createLine(x, y, pageNum);
+    //             // console.log('Line created', lineId);
+
+    //             // this.createMarkerDOM(x, y, "", lineId, canvasWrapper, pageNum, line_count);
+    //             const penDiv = this.createPenDiv(x, y);
+    //             canvasWrapper.appendChild(penDiv);
+    //         }
+    //     });
+
+    //     canvas.addEventListener('mousemove', event => {
+    //         if (isDrawing) {
+    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
+    //             console.log(x,y);
+    //             // penDiv.style.left = `${x}px`;
+    //             // penDiv.style.top = `${y}px`;
+    //             const penDiv = this.createPenDiv(x, y);
+    //             canvasWrapper.appendChild(penDiv);
+    //             // this.createMarkerDOM(x, y, "", lineId, canvasWrapper, pageNum, line_count);
+    //             // line_count += 1;
+    //         }
+    //     });
+
+    //     canvas.addEventListener('mouseup', event => {
+    //         if (event.button === 0) {
+    //             isDrawing = false;
+    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
+    //             const penDiv = this.createPenDiv(x, y);
+    //             canvasWrapper.appendChild(penDiv);
+
+    //         }
+    //     });
+
+    //     canvas.addEventListener('mouseout', () => {
+    //         isDrawing = false;
+    //     });
+
+    //     // const lines = this.data.lines[pageNum] || [];
+    //     // for (const line of lines) {
+    //     //     line_count += 1;
+    //     //     this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, canvasWrapper, pageNum, line_count);
+    //     // }
     // }
-    
-    
 
     getCanvasClickPosition(event, canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -624,115 +394,238 @@ class ProductPDFAnnotation extends Component {
         return { x, y };
     }
 
-    // The one with highlighter
-    // initializeMarkers(pageNum, canvasWrapper, canvas) {
-    //     let line_count = 0;
-    
-    //     let isDrawing = false;
-    //     let startX, startY, highlightDiv;
-    
-    //     canvas.addEventListener('mousedown', async event => {
-    //         const { x, y } = this.getCanvasClickPosition(event, canvas);
-    
-    //         if (!this.highlightMode) {
-    //             line_count += 1;
-    //             const line_id = await this.createLine(x, y, pageNum);
-    //             console.log('Line created', line_id);
-    //             const line_data = await this.orm.searchRead(
-    //                 "product.pdf.annotation.line",
-    //                 [
-    //                     ["id", "=", line_id],
-    //                 ],
-    //                 ["user_id"]
-    //             );
-    //             console.log(line_data);
-    //             const user_name = line_data[0].user_id[1];
-    //             this.createMarkerDOM(x, y, "", line_id, user_name, canvasWrapper, pageNum, line_count);
-    //         } else {
-    //             isDrawing = true;
-    //             startX = x;
-    //             startY = y;
-    //             highlightDiv = this.createHighlightDiv(x, y, 0, 0);
-    //             canvasWrapper.appendChild(highlightDiv);
-    //         }
-    //     });
-    
-    //     canvas.addEventListener('mousemove', event => {
-    //         if (isDrawing) {
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             const width = x - startX;
-    //             const height = y - startY;
-    //             highlightDiv.style.width = `${width}px`;
-    //             highlightDiv.style.height = `${height}px`;
-    //         }
-    //     });
-    
-    //     canvas.addEventListener('mouseup', event => {
-    //         if (isDrawing) {
-    //             isDrawing = false;
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             const width = x - startX;
-    //             const height = y - startY;
-    //             this.saveHighlightData(startX, startY, width, height, pageNum, highlightDiv);
-    //         }
-    //     });
-    
-    //     const lines = this.data.lines[pageNum] || [];
-    //     for (const line of lines) {
-    //         line_count += 1;
-    //         this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, line.user_id[1], canvasWrapper, pageNum, line_count);
-    //     }
-    
-    //     this.initializeHighlightMode(pageNum, canvasWrapper, canvas);
-    //     this.loadHighlightData(pageNum, canvasWrapper);
-    // }
-
-    createMarkerDOM(x, y, height, width, description, line_id,user, canvasWrapper, pageNum, line_count) {
+    createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
         console.log(user,'test');
-        const markerDiv = this.createMarkerDiv(x, y, line_id, width, height );
+        const markerDiv = this.createMarkerDiv(x, y, line_id);
         canvasWrapper.appendChild(markerDiv);
+
         const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
         this.table_tbody.el.appendChild(newTableRow);
+
         this.makeDraggable(markerDiv, line_id);
+    }
+
+
+    createHighlighterDOM(x, y, height, width, highlighter_marker_id,canvasWrapper, pageNum, marker_count) {
+        const hihglighterDiv = this.createHighlighterDiv(x, y, highlighter_marker_id, width, height );
+        canvasWrapper.appendChild(hihglighterDiv);
+        this.removeHighlighterMarkerDiv(hihglighterDiv, highlighter_marker_id);
                                                
     }
 
-    createMarkerDiv(x, y, line_id, width, height) {
-        const markerDiv = document.createElement('div');
-        markerDiv.style.position = 'absolute';
-        markerDiv.style.left = `${x}px`;
-        markerDiv.style.top = `${y}px`;
-        markerDiv.style.width = `${width}px`;
-        markerDiv.style.height = `${height}px`;
-        markerDiv.style.backgroundColor = 'yellow';
-        markerDiv.style.opacity = '0.5';
-        markerDiv.id = `marker_${line_id}`;
-        // markerDiv.classList.add('text_highlight', 'draggable');
-        // console.log('div id',highlightDiv.id);
-        return markerDiv;
+    initializeCanvas(pageNum, canvasWrapper, canvas) {
+        // const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'red'; 
+        let drawing = false;
+        let lines = [];
 
-        // const markerDiv = document.createElement('div');
-        // markerDiv.style.position = 'absolute';
-        // markerDiv.style.left = `${x}px`;
-        // markerDiv.style.top = `${y}px`;
-        // markerDiv.style.width = `${width}px`;
-        // markerDiv.style.height = `${height}px`;
-        // markerDiv.style.backgroundColor = isHighlighter ? 'yellow' : 'red'; // Use yellow for highlighter, red for marker
-        // markerDiv.style.opacity = isHighlighter ? '0.5' : '1'; // Semi-transparent for highlighter
-        // markerDiv.style.borderRadius = isHighlighter ? '0' : '50%'; // No border radius for highlighter, full border radius for marker
-        // markerDiv.id = `marker_${line_id}`;
-        // markerDiv.classList.add('text_highlight', 'draggable');
-        // return markerDiv;
+                           
+        // Load existing drawing data
+        this.loadDrawingData(ctx,canvasWrapper,pageNum);
+ 
+        
+        const annotateIcon = document.getElementById('annotateIcon');
+        if (!annotateIcon) {
+            console.error('Annotate icon not found');
+            return;
+        }
+        const highlightIcon = document.getElementById('highlightIcon');
+        if (!highlightIcon) {
+            console.error('Highlight icon not found');
+            return;
+        }
+        const drawIcon = document.getElementById('drawIcon');
+        if (!drawIcon) {
+            console.error('Draw icon not found');
+            return;
+        }
+
+        if (!drawIcon.dataset.listenerAttached) {
+            drawIcon.addEventListener('click', () => {
+                this.draw = !this.draw;
+                this.annotateMode = false;
+                this.highlightMode = false;
+                annotateIcon.classList.remove('active');
+                highlightIcon.classList.remove('active');
+                console.log('Draw Mode:',this.draw)
+                if (this.draw) {
+                    drawIcon.classList.add('active');
+                    console.log('Draw button activated');
+                    console.log('Global Draw Mode:',this.draw)
+                } else {
+                    drawIcon.classList.remove('active');
+                    console.log('Draw icon deactivated');
+                    console.log('Global Draw Mode:',this.draw)
+                }
+            });
+            drawIcon.dataset.listenerAttached = 'true';
+        }
+    
+            canvas.addEventListener('mousedown', (e) => {
+                drawing = this.draw;
+                ctx.beginPath();
+                // console.log('BEGIN PATH---',ctx.beginPath());
+                ctx.moveTo(e.offsetX, e.offsetY);
+                lines.push([{ x: e.offsetX, y: e.offsetY }]);
+                // console.log('Move to----> ',ctx.moveTo(e.offsetX, e.offsetY))
+            
+        });
+
+        canvas.addEventListener('mousemove',  (e) => {
+            if (drawing) {
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+                if (lines.length) {
+                     lines[lines.length - 1].push({ x: e.offsetX, y: e.offsetY });
+                }
+               
+            }
+        });
+
+        canvas.addEventListener('mouseup', async () => {
+            drawing = false;
+            this.draw = false;
+            drawIcon.classList.remove('active');
+            this.saveDrawingData(pageNum, lines);
+        });
+
+        canvas.addEventListener('mouseout', () => {
+            // this.draw = false;
+            // drawIcon.classList.remove('active');
+            drawing = false;
+        }); 
     }
 
-    // createMarkerDiv(x, y, line_id) {
-    //     const markerDiv = document.createElement('div');
-    //     markerDiv.style.left = `${x}px`;
-    //     markerDiv.style.top = `${y}px`;
-    //     markerDiv.id = `marker_${line_id}`;
-    //     markerDiv.classList.add('img_marker');
-    //     return markerDiv;
+    initializeUndo(pageNum, canvasWrapper, canvas) {
+        const undoIcon = document.getElementById('undoIcon');
+        if (!undoIcon) {
+            console.error('Undo icon not found');
+            return;
+        }
+
+        if (!undoIcon.dataset.listenerAttached) {
+            undoIcon.addEventListener('click', async() => {
+                try {
+                    const latestDrawing = await this.orm.searchRead(
+                        "drawing.data",
+                        [["document_id", "=", this.active_id]],
+                        ["id", "page_no", "drawing_data"],
+                        { limit: 1, order: "id desc" }
+                    );
+                    if (latestDrawing) {
+                        console.log('Latest Drawing:',latestDrawing[0].id);
+                        await this.orm.unlink("drawing.data", [latestDrawing[0].id]);
+                        location.reload();
+                        // Load existing drawing data
+                    }
+                }
+
+                catch (error) {
+                    console.error('Error fetching the latest drawing:', error);
+                }
+
+            });
+
+            
+            undoIcon.dataset.listenerAttached = 'true';
+        }
+    }
+
+
+
+    async saveDrawingData(pageNum,lines) {
+        const drawing_id = await this.orm.create("drawing.data", [{
+            page_no: pageNum,
+            drawing_data: JSON.stringify(lines),
+            document_id: this.active_id
+        }]);
+    }
+    
+    async loadDrawingData(ctx,canvasWrapper,pageNum) {
+        const drawings = this.data.drawing[pageNum] || [];
+        console.log('Drawings LOaded',drawings);
+        for (const drawing of drawings) {
+            const drawingData = JSON.parse(drawing.drawing_data);
+            drawingData.forEach(data => {
+                ctx.beginPath();
+                ctx.moveTo(data[0].x, data[0].y);
+                data.forEach(point => {
+                    ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            });
+        }
+            
+
+    }
+
+
+
+    removeHighlighterMarkerDiv(highlighterDiv, highlighter_marker_id) {
+        highlighterDiv.onclick = (e) => {
+            const firstConfirmation = confirm("Are you sure you want to delete this marker?");
+            if (firstConfirmation) {
+                highlighterDiv.remove();
+                this.orm.unlink("pdf.highlight.marker", [highlighter_marker_id]);
+            }
+        };
+    }
+
+
+
+    createMarkerDiv(x, y, line_id) {
+        const markerDiv = document.createElement('div');
+        markerDiv.style.position = 'absolute'; // Ensure absolute positioning
+        markerDiv.style.left = `${x}px`;
+        markerDiv.style.top = `${y}px`;
+        markerDiv.id = `marker_${line_id}`;
+        markerDiv.classList.add('marker');
+
+        // Create the Font Awesome icon element
+        const icon = document.createElement('i');
+        icon.classList.add('fa', 'fa-commenting');
+        icon.style.color = 'red'; // Set the color of the icon
+        icon.style.fontSize = '24px'; // Set the size of the icon
+
+        // Append the icon to the markerDiv
+        markerDiv.appendChild(icon);
+        return markerDiv;
+    }
+
+    createHighlighterDiv(x, y, highlighter_marker_id, width, height) {
+        const highlightDiv = document.createElement('div');
+        highlightDiv.style.position = 'absolute';
+        highlightDiv.style.left = `${x}px`;
+        highlightDiv.style.top = `${y}px`;
+        highlightDiv.style.width = `${width}px`;
+        highlightDiv.style.height = `${height}px`;
+        highlightDiv.style.backgroundColor = 'yellow';
+        highlightDiv.style.opacity = '0.5';
+        highlightDiv.id = `marker_${highlighter_marker_id}`;
+        highlightDiv.classList.add('text_highlight');
+        return highlightDiv;
+    }
+
+    async createHighlightMarker(x, y, page_no) {
+        const [highlight_marker_id] = await this.orm.create("pdf.highlight.marker", [{
+            page_no,
+            layerx: x,
+            layery: y,
+            document_id: this.active_id
+        }]);
+        return highlight_marker_id;
+    }
+
+    async updateHighlightMarker(resId, data) {
+        await this.orm.write("pdf.highlight.marker", [resId], data);
+    }
+
+    // async unlinkHighlightMarker(resId) {
+    //     await this.orm.unlink("pdf.highlight.marker", [resId]);
     // }
+
 
     async createLine(x, y, page_no) {
         const [line_id] = await this.orm.create("product.pdf.annotation.line", [{
@@ -746,39 +639,6 @@ class ProductPDFAnnotation extends Component {
 
     async updateLine(resId, data) {
         await this.orm.write("product.pdf.annotation.line", [resId], data);
-    }
-
-    async updateHighlighter(resId, data) {
-        await this.orm.write("product.pdf.annotation.hiighlight", [resId], data);
-    }
-
-    makeHighlighterDraggable(element, highlightId) {
-        let offsetX, offsetY;
-
-        element.addEventListener('mousedown', (e) => {
-            offsetX = e.clientX - parseInt(element.style.left);
-            offsetY = e.clientY - parseInt(element.style.top);
-            document.addEventListener('mousemove', moveElement);
-            document.addEventListener('mouseup', stopMovingElement);
-        });
-
-        const moveElement = (e) => {
-            element.style.left = `${e.clientX - offsetX}px`;
-            element.style.top = `${e.clientY - offsetY}px`;
-        };
-
-        const stopMovingElement = () => {
-            document.removeEventListener('mousemove', moveElement);
-            document.removeEventListener('mouseup', stopMovingElement);
-            this.saveHighlightPosition(highlightId, parseInt(element.style.left), parseInt(element.style.top));
-        };
-    }
-
-    saveHighlightPosition(highlightId, x, y) {
-        this.orm.write("product.pdf.annotation.highlight", [highlightId], {
-            layerx: x,
-            layery: y,
-        });
     }
 
     // Make an element draggable
@@ -842,28 +702,59 @@ class ProductPDFAnnotation extends Component {
         }
     }
 
-    createTableRow(rowId, description,user, pageNumber, lineNumber, markerDiv) {
+    // Original
+    // createTableRow(rowId, description,user, pageNumber, lineNumber, markerDiv) {
+    //     const tr = document.createElement('tr');
+    //     tr.id = `table_line_${rowId}`;
+    //     tr.className = 'table_tr_line';
+    //     tr.innerHTML = `
+    //         <th scope="row"><span>${pageNumber}</span></th>
+    //         <th scope="row"><span>${user}</span></th>
+    //         <td><textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Description ..">${description}</textarea></td>
+    //         <td><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></td>
+    //     `;
+
+    //     tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
+    //     tr.onmouseout = () => this.removeHoverEffect();
+    //     tr.onclick = () => this.scrollToElement(markerDiv);
+
+    //     markerDiv.onmouseover = () => this.addHoverEffect(markerDiv, tr);
+    //     markerDiv.onmouseout = () => this.removeHoverEffect();
+    //     markerDiv.onclick = () => this.scrollToElement(tr);
+
+    //     this.initializeDeleteMarker(tr, markerDiv, rowId);
+    //     this.initializeSaveMarker(tr, rowId);
+
+    //     return tr;
+    // }
+
+    createTableRow(rowId, description, user, pageNumber, lineNumber, markerDiv) {
         const tr = document.createElement('tr');
         tr.id = `table_line_${rowId}`;
         tr.className = 'table_tr_line';
         tr.innerHTML = `
-            <th scope="row"><span>${pageNumber}</span></th>
-            <th scope="row"><span>${user}</span></th>
-            <td><textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Description ..">${description}</textarea></td>
-            <td><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></td>
+            <td>
+                <div class="annotation-details">
+                    <div><strong>Page:</strong> <span>${pageNumber}</span></div>
+                    <div><strong>User:</strong> <span>${user}</span></div>
+                    <div><strong>Comment:</strong></div>
+                    <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Comment ..">${description}</textarea>
+                    <div class="text-end pt-2"><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></div>
+                </div>
+            </td>
         `;
-
+    
         tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
         tr.onmouseout = () => this.removeHoverEffect();
         tr.onclick = () => this.scrollToElement(markerDiv);
-
+    
         markerDiv.onmouseover = () => this.addHoverEffect(markerDiv, tr);
         markerDiv.onmouseout = () => this.removeHoverEffect();
         markerDiv.onclick = () => this.scrollToElement(tr);
-
+    
         this.initializeDeleteMarker(tr, markerDiv, rowId);
         this.initializeSaveMarker(tr, rowId);
-
+    
         return tr;
     }
 
@@ -872,13 +763,14 @@ class ProductPDFAnnotation extends Component {
         markerDiv.classList.add('marker_hover');
         tr.classList.add('marker_hover');
     }
+    
 
     removeHoverEffect() {
         document.querySelectorAll('.marker_hover').forEach(el => el.classList.remove('marker_hover'));
     }
 
     scrollToElement(element) {
-        const container = document.getElementById(element.classList.contains('img_marker') ? 'pdf-container' : 'description_container');
+        const container = document.getElementById(element.classList.contains('marker') ? 'pdf-container' : 'description_container');
         const containerRect = container.getBoundingClientRect();
         const elementRect = element.getBoundingClientRect();
 
@@ -899,7 +791,6 @@ class ProductPDFAnnotation extends Component {
             }
         };
     }
-
 
     initializeSaveMarker(tr, rowId) {
         const inputField = tr.querySelector('.table_tbody_input');

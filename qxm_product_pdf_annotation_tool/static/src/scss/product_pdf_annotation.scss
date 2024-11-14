@@ -1,5 +1,4 @@
 .pdf_container {
-
     .page-div {
         position: relative;
         text-align: center;
@@ -17,12 +16,12 @@
         position: relative;
     }
     .marker_hover{
-        background-color: #6DADCB !important;
+        background-color: #339ecf !important;
     }
     .active {
-        border: 2px solid lightblue;
+        border: 2px solid rgb(68, 171, 206);
         font-weight: bold;
-        box-shadow: 0 0 15px 5px lightblue;
+        box-shadow: 0 0 15px 5px rgb(44, 142, 175);
         transition: all 0.3s ease;
     }
     #page-list {
@@ -53,7 +52,6 @@
         cursor:pointer;
         position:absolute;
       }
-      
     .custom-description-input {
         padding: 10px;
         width: 100%;
@@ -74,13 +72,17 @@
         }
       }
 
-    .highlight {
-        position: absolute;
-        background-color: rgba(17, 0, 255, 0.5);
+    .annotation-details {
+        display: flex;
+        flex-direction: column;
     }
-    .textLayer {
-        position: absolute;
-        pointer-events: none;
-        opacity: 0;
+    
+    .annotation-details div {
+        margin-bottom: 5px;
+    }
+    
+    .custom-description-textarea {
+        width: 100%;
+        resize: vertical;
     }
 }

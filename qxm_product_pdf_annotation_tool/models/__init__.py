@@ -3,4 +3,5 @@
 
 from . import pdf_annotation_line
 from . import product_document
-from . import pdf_annotation_highlight
+from . import pdf_highlight_marker
+from . import drawing_data

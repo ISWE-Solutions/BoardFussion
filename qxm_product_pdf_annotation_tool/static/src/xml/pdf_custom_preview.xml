@@ -13,15 +13,15 @@
                             <div id="pdf-container"/>
                         </div>
                         <div class="col-sm-3" id="description_container">
-                            <table class="table">
-                                <thead class="sticky-top">
+                            <table class="table table-bordered">
+                                <!-- <thead class="sticky-top">
                                     <tr>
                                         <th scope="col" style="width: 10%;">Page.</th>
                                         <th scope="col" style="width: 10%;">Users</th>
                                         <th scope="col" style="width: 80%;">Description</th>
                                     </tr>
-                                </thead>
-                                <tbody t-ref="table_tbody">
+                                </thead> -->
+                                <tbody class="border" t-ref="table_tbody">
                                 </tbody>
                             </table>
                         </div>

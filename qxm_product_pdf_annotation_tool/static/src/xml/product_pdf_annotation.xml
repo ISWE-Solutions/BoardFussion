@@ -13,18 +13,30 @@
                             <div id="pdf-container"/>
                         </div>
                         <div class="col-sm-3" id="description_container">
-                            <button id="annotateIcon" class="fa fa-pencil"/>
-                                <!-- Annotate</button> -->
+                            <div class="row">
+                                <div class="col-sm-2">
+                                    <button id="highlightIcon" class="fa fa-pencil btn btn-warning" title="Highlight Mode"/>
+                                </div>
+                                <div class="col-sm-2">
+                                    <button id="annotateIcon" class="fa fa-comment btn btn-danger" title="Annotate Mode"/>
+                                </div>
+                                <div class="col-sm-2">
+                                    <button id="drawIcon" class="fa fa-paint-brush btn btn-info" title="Drawing Mode"/>
+                                </div>
+                                <div class="col-sm-2">
+                                    <button id="undoIcon" class="fa fa-undo btn btn-primary" title="Undo Last Drawing"/>
+                                </div>
+                            </div>
                             <table class="table">
-                                <thead class="sticky-top">
+                                <!-- <thead class="sticky-top">
                                     <tr>
                                         <th scope="col" style="width: 10%;">Page.</th>
                                         <th scope="col" style="width: 10%;">Users</th>
                                         <th scope="col" style="width: 80%;">Description</th>
                                         <th scope="col" style="width: 10%;"></th>
                                     </tr>
-                                </thead>
-                                <tbody t-ref="table_tbody">
+                                </thead> -->
+                                <tbody class="border-top border-dark" t-ref="table_tbody">
                                 </tbody>
                             </table>
                         </div>
