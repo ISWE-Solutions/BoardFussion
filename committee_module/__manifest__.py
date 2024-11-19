@@ -19,12 +19,13 @@ Long description of module's purpose
 
     # any module necessary for this one to work correctly
     'depends': ['base', 'hr', 'hr_skills', 'hr_skills_survey', 'documents', 'hr_contract_salary', 'hr_gamification',
-                'hr_appraisal', 'hr_contract', 'hr_payroll', "product"],
+                'hr_appraisal', 'hr_contract', 'hr_payroll', "product","project","account","sale","web","website_sale", "website_partner", "task_overdue_email_odoo"],
 
     "data": [
         # security/ir.model.access.csv",
         "data/tag_data.xml",
         # data/hr_appraisal_templates_inherit.xml",
+        # "views/title.xml",
         "views/member_view.xml",
         "views/views.xml",
         "views/email.xml",
@@ -55,6 +56,8 @@ Long description of module's purpose
             "committee_module/static/src/components/**/*.js",
             "committee_module/static/src/components/**/*.xml",
             "committee_module/static/src/components/**/*.scss",
+            "committee_module/static/src/js/favicon.js",
+            "committee_module/static/src/js/title.js",
         ],
     },
     'license': "LGPL-3",
