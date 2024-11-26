@@ -10,4 +10,4 @@ class PdfHighlightMarker(models.Model):
     width = fields.Char('Width')
     height = fields.Char('Height')
     user_id = fields.Many2one('res.users', string='User', default=lambda self: self.env.user)
-    document_id = fields.Many2one('product.document', 'Document')
+    document_id = fields.Many2one('product.document', 'Document', ondelete='cascade')

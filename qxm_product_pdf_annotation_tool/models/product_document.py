@@ -33,4 +33,10 @@ class ProductDocument(models.Model):
         drawing = {page: [item for item in drawing if item['page_no'] == page] for page in set(item['page_no'] for item in drawing)}
         highlighted_marks = {page: [item for item in highlighted_marks if item['page_no'] == page] for page in set(item['page_no'] for item in highlighted_marks)}
         lines = {page: [item for item in lines if item['page_no'] == page] for page in set(item['page_no'] for item in lines)}
+        # Replies for each line
+        for page, line in lines.items():
+            for item in line:
+                item['replies'] = self.env['pdf.reply.annotation'].sudo().search_read([('annotation_id', '=', item['id'])], [])
+        print('LINES------------------------------>  ',lines)
+        
         return {'pdf':data[0] if data else {}, 'lines':lines, 'highlighted_marks':highlighted_marks, 'drawing':drawing}

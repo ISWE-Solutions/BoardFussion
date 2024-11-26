@@ -211,7 +211,8 @@ class ProductPDFAnnotation extends Component {
         const lines = this.data.lines[pageNum] || [];
         for (const line of lines) {
             line_count += 1;
-            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count);
+            // console.log('LINES---> ',line.replies);
+            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count, line.replies);
         }
     }
 
@@ -319,74 +320,6 @@ class ProductPDFAnnotation extends Component {
         }
     }
 
-    // initializePen(pageNum, canvasWrapper, canvas) {
-    //     let line_count = 0;
-    //     let isDrawing = false;
-    //     let startX, startY, penDiv;
-
-    //     // const annotateIcon = document.getElementById('annotateIcon');
-    //     // if (!annotateIcon) {
-    //     //     console.error('Annotate icon not found');
-    //     //     return;
-    //     // }
-
-    //     // const highlightIcon = document.getElementById('highlightIcon');
-    //     // if (!highlightIcon) {
-    //     //     console.error('Highlight icon not found');
-    //     //     return;
-    //     // }
-
-    //     canvas.addEventListener('mousedown', async event => {
-    //         if (event.button === 0) {
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             startX = x;
-    //             startY = y;
-    //             isDrawing = true;
-
-    //             // Create a new line in the backend
-    //             // lineId = await this.createLine(x, y, pageNum);
-    //             // console.log('Line created', lineId);
-
-    //             // this.createMarkerDOM(x, y, "", lineId, canvasWrapper, pageNum, line_count);
-    //             const penDiv = this.createPenDiv(x, y);
-    //             canvasWrapper.appendChild(penDiv);
-    //         }
-    //     });
-
-    //     canvas.addEventListener('mousemove', event => {
-    //         if (isDrawing) {
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             console.log(x,y);
-    //             // penDiv.style.left = `${x}px`;
-    //             // penDiv.style.top = `${y}px`;
-    //             const penDiv = this.createPenDiv(x, y);
-    //             canvasWrapper.appendChild(penDiv);
-    //             // this.createMarkerDOM(x, y, "", lineId, canvasWrapper, pageNum, line_count);
-    //             // line_count += 1;
-    //         }
-    //     });
-
-    //     canvas.addEventListener('mouseup', event => {
-    //         if (event.button === 0) {
-    //             isDrawing = false;
-    //             const { x, y } = this.getCanvasClickPosition(event, canvas);
-    //             const penDiv = this.createPenDiv(x, y);
-    //             canvasWrapper.appendChild(penDiv);
-
-    //         }
-    //     });
-
-    //     canvas.addEventListener('mouseout', () => {
-    //         isDrawing = false;
-    //     });
-
-    //     // const lines = this.data.lines[pageNum] || [];
-    //     // for (const line of lines) {
-    //     //     line_count += 1;
-    //     //     this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id, canvasWrapper, pageNum, line_count);
-    //     // }
-    // }
-
     getCanvasClickPosition(event, canvas) {
         const rect = canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) - 3;
@@ -394,12 +327,12 @@ class ProductPDFAnnotation extends Component {
         return { x, y };
     }
 
-    createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count) {
+    createMarkerDOM(x, y, description, line_id,user, canvasWrapper, pageNum, line_count, reply_ids) {
         console.log(user,'test');
         const markerDiv = this.createMarkerDiv(x, y, line_id);
         canvasWrapper.appendChild(markerDiv);
 
-        const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv);
+        const newTableRow = this.createTableRow(line_id, description,user, pageNum, line_count, markerDiv, reply_ids);
         this.table_tbody.el.appendChild(newTableRow);
 
         this.makeDraggable(markerDiv, line_id);
@@ -485,10 +418,11 @@ class ProductPDFAnnotation extends Component {
         });
 
         canvas.addEventListener('mouseup', async () => {
+            // oNLY cREATE THE DRAWING DATA IN THE BACKEND WHEN BOTH DRAW VARIABLES ARE TRUE!
+            if (this.draw == true && drawing == true) {
+                this.saveDrawingData(pageNum, lines);
+            }
             drawing = false;
-            this.draw = false;
-            drawIcon.classList.remove('active');
-            this.saveDrawingData(pageNum, lines);
         });
 
         canvas.addEventListener('mouseout', () => {
@@ -541,6 +475,7 @@ class ProductPDFAnnotation extends Component {
             drawing_data: JSON.stringify(lines),
             document_id: this.active_id
         }]);
+        console.log('Drawing Created!',drawing_id);
     }
     
     async loadDrawingData(ctx,canvasWrapper,pageNum) {
@@ -728,7 +663,7 @@ class ProductPDFAnnotation extends Component {
     //     return tr;
     // }
 
-    createTableRow(rowId, description, user, pageNumber, lineNumber, markerDiv) {
+    createTableRow(rowId, description, user, pageNumber, lineNumber, markerDiv, reply_ids) {
         const tr = document.createElement('tr');
         tr.id = `table_line_${rowId}`;
         tr.className = 'table_tr_line';
@@ -741,8 +676,137 @@ class ProductPDFAnnotation extends Component {
                     <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Comment ..">${description}</textarea>
                     <div class="text-end pt-2"><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></div>
                 </div>
+                <div>
+                    <button id="replyIcon" class="reply_button btn btn-primary" title="Add a reply for this annotation">Add Reply</button>
+                </div>
             </td>
         `;
+        // loop through reply_ids
+        if (reply_ids) {
+        for (const reply_id of reply_ids) {
+            console.log('Looping through Reply ID:', reply_id);
+            console.log('Annotation ID:', reply_id.annotation_id);
+            console.log('Reply:', reply_id.reply);
+            console.log('Unique Button:',reply_id.unique_button);
+            console.log('Delete Unique Button:',reply_id.delete_unique_button);
+            console.log('Replying User:',reply_id.user_id[1]); // user_D contains two things, at 0 we have id and at 1 we have name
+        
+
+            const replyIcon = tr.querySelector('.reply_button'); // Find the reply button
+            if (!replyIcon) {
+                console.error('Reply button not found');
+                return;
+            }
+
+            // Locate the <td> containing the reply button
+            const parentTd = replyIcon.closest('td');
+            if (!parentTd) {
+                console.error('Parent <td> not found');
+                return;
+            }
+    
+            // Create a new reply section
+            const newDiv = document.createElement('div');
+            newDiv.className = 'reply-details';
+            const uniqueId = reply_id.unique_button; // Generate a unique ID for each reply'
+            const deleteuniqueId = reply_id.delete_unique_button; // Generate a unique ID for each reply delete button'
+            console.log(`Unique ID FOR SAVE BUTTON!!!: ${uniqueId}`);
+            console.log(`Unique ID FOR DELETE BUTTON!!!: ${deleteuniqueId}`);
+
+            newDiv.innerHTML = `
+            <div>
+                <div><strong>Reply:</strong></div>
+                <div><strong>User:</strong> <span>${reply_id.user_id[1]}</span></div>
+                <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here...">${reply_id.reply}</textarea>
+            </div>
+            <div class="text-end pt-2">
+                <button id="${deleteuniqueId}" class="reply-delete-button fa fa-trash" title="Delete this reply." aria-hidden="true"></button>
+                <button id="${uniqueId}" class="reply-save-button btn btn-success fa fa-share-square" title="Save this reply" ></button>
+            </div>
+        `;
+
+            // replyIcon.insertAdjacentHTML('beforebegin',newDiv.innerHTML);
+    
+
+            // Insert the new reply section before the reply button
+            replyIcon.parentElement.insertBefore(newDiv, replyIcon);
+            // Append the new reply div to the parent <td>
+            // parentTd.appendChild(newDiv);
+
+            
+
+            const saveButton = newDiv.querySelector('.reply-save-button');
+            const deleteButton = newDiv.querySelector('.reply-delete-button');
+            const buttonId = saveButton.id; // Fetch the ID of the button
+            const deletebuttonId = deleteButton.id; // Fetch the ID of the button
+            saveButton.onclick = async () => {
+            const replyText = newDiv.querySelector('textarea').value;
+            console.log(`Saved Reply: ${replyText}`);
+            alert(`Reply Saved: ${replyText}`);
+            console.log(`Save Button ID: ${buttonId}`);
+
+                // Set the textarea to readonly
+                // replyText.setAttribute('readonly', '1'); // Makes the textarea non-editable
+            
+                // Optional: Provide feedback to the user
+                // saveButton.innerText = 'Saved'; // Change button text to indicate it's saved
+                // saveButton.disabled = true; // Disable the save button to prevent re-saving
+
+                // Domain
+                console.log('Domain-->:', [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                ]);  
+
+                // Search if the reply exists in backend.
+                const replyData = await this.orm.searchRead("pdf.reply.annotation", [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                ]);
+                console.log('Reply Data:', replyData);
+                
+                
+                if (replyData.length === 0) {
+                    console.log('No Reply Found');
+                    // Create The reply in backend!
+                    await this.orm.create("pdf.reply.annotation", [{
+                        annotation_id: rowId,
+                        unique_button: buttonId,
+                        delete_unique_button: deletebuttonId,
+                        reply: replyText
+                    }]);
+                }
+
+                else {
+                    // Update the reply in backend!
+                    console.log('Reply Found', replyData);
+                    this.orm.write("pdf.reply.annotation", [replyData[0].id], {
+                        reply: replyText
+                    });
+                }    
+            };
+
+            // Attach an event listener to the delete button
+            deleteButton.onclick = async () => {
+                // Search if the reply exists in backend.
+                const replyData = await this.orm.searchRead("pdf.reply.annotation", [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                    ["delete_unique_button", "=", deletebuttonId],
+                ]);
+                console.log('Reply Data to be unlinked!!!!:', replyData);
+                const secondConfirmation = confirm("Are you sure you want to delete this reply?");
+                if (secondConfirmation) {
+                    newDiv.remove();
+                    // Delete the reply from the backend
+                    if (replyData.length > 0) {
+                        this.orm.unlink("pdf.reply.annotation", [replyData[0].id]);
+                    }
+                }
+            };  
+        }
+    }
+
     
         tr.onmouseover = () => this.addHoverEffect(markerDiv, tr);
         tr.onmouseout = () => this.removeHoverEffect();
@@ -754,6 +818,7 @@ class ProductPDFAnnotation extends Component {
     
         this.initializeDeleteMarker(tr, markerDiv, rowId);
         this.initializeSaveMarker(tr, rowId);
+        this.initializeReply(tr,rowId,user);
     
         return tr;
     }
@@ -792,12 +857,182 @@ class ProductPDFAnnotation extends Component {
         };
     }
 
+
+    // initializeReply(tr,rowId) {
+    //     const replyIcon = tr.querySelector('.reply_button');
+    //     if (!replyIcon) {
+    //         console.error('Reply icon not found');
+    //         return;
+    //     }
+    //     replyIcon.onclick = () => {
+    //         console.log('Reply Clicked');
+    //         const reply_id = this.createReply(rowId);
+            
+    //         // Find the existing tr element where you want to append the new text area
+    //         // const tr = document.querySelector('.table_tr_line'); // Adjust the selector as needed
+
+    //                 // Locate the <td> containing the reply button
+    //         const parentTd = replyIcon.closest('td');
+    //         if (!parentTd) {
+    //             console.error('Parent <td> not found');
+    //             return;
+    //         }
+
+    //                 // Insert new HTML before the reply button
+    //         replyIcon.insertAdjacentHTML('beforebegin', `
+    //             <div class="new-html-section">
+    //                 <hr/>
+    //                 <strong>Reply:</strong>
+    //                 <input type="text" class="form-control table_tbody_reply" placeholder="Enter text here...">
+    //                 <hr/>
+    //             </div>
+    //         `);
+    //     };
+
+    // }
+
+    initializeReply(tr, rowId,user) {
+        const replyIcon = tr.querySelector('.reply_button'); // Find the reply button
+        if (!replyIcon) {
+            console.error('Reply button not found');
+            return;
+        }
+    
+        replyIcon.onclick = () => {
+            console.log('Reply Clicked');
+    
+            // Locate the <td> containing the reply button
+            const parentTd = replyIcon.closest('td');
+            if (!parentTd) {
+                console.error('Parent <td> not found');
+                return;
+            }
+    
+            // Create a new reply section
+            const newDiv = document.createElement('div');
+            newDiv.className = 'reply-details';
+            const uniqueId = `reply_${Date.now()}`; // Generate a unique ID for each reply'
+            const deleteuniqueId = `delete_${Date.now()}`; // Generate a unique ID for each reply delete button'
+            console.log(`Unique ID FOR SAVE BUTTON!!!: ${uniqueId}`);
+            console.log(`Unique ID FOR DELETE BUTTON!!!: ${deleteuniqueId}`);
+    
+            newDiv.innerHTML = `
+                <div>
+                    <div><strong>Reply:</strong></div>
+                    <div><strong>User:</strong> <span>${user}</span></div>
+                    <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here..."></textarea>
+                </div>
+                <div class="text-end pt-2">
+                    <button id="${deleteuniqueId}" class="reply-delete-button fa fa-trash" title="Delete this reply"></button>
+                    <button id="${uniqueId}" class="reply-save-button btn btn-success fa fa-share-square" title="Save this reply"></button>
+                </div>
+            `;
+    
+            // Append the new reply div to the parent <td>
+            // parentTd.appendChild(newDiv);
+
+            // Insert the new reply section before the reply button
+            replyIcon.parentElement.insertBefore(newDiv, replyIcon);
+            
+            // replyIcon.insertAdjacentHTML('beforebegin',newDiv.innerHTML);
+    
+            // Attach an event listener to the button
+            // const saveButton = newDiv.querySelector('.reply-save-button');
+            const saveButton = newDiv.querySelector('.reply-save-button');
+            const deleteButton = newDiv.querySelector('.reply-delete-button');
+
+            const buttonId = saveButton.id; // Fetch the ID of the button
+            const deletebuttonId = deleteButton.id; // Fetch the ID of the button
+            saveButton.onclick = async () => {
+            const replyText = newDiv.querySelector('textarea').value;
+            console.log(`Saved Reply: ${replyText}`);
+            alert(`Reply Saved: ${replyText}`);
+            console.log(`Save Button ID: ${buttonId}`);
+
+                // Set the textarea to readonly
+                // replyText.setAttribute('readonly', '1'); // Makes the textarea non-editable
+            
+                // Optional: Provide feedback to the user
+                // saveButton.innerText = 'Saved'; // Change button text to indicate it's saved
+                // saveButton.disabled = true; // Disable the save button to prevent re-saving
+
+                // Domain
+                console.log('Domain-->:', [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                ]);  
+
+                // Search if the reply exists in backend.
+                const replyData = await this.orm.searchRead("pdf.reply.annotation", [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                ]);
+                console.log('Reply Data:', replyData);
+                
+                
+                if (replyData.length === 0) {
+                    console.log('No Reply Found');
+                    // Create The reply in backend!
+                    await this.orm.create("pdf.reply.annotation", [{
+                        annotation_id: rowId,
+                        unique_button: buttonId,
+                        delete_unique_button: deletebuttonId,
+                        reply: replyText
+                    }]);
+                }
+
+                else {
+                    // Update the reply in backend!
+                    console.log('Reply Found', replyData);
+                    this.orm.write("pdf.reply.annotation", [replyData[0].id], {
+                        reply: replyText
+                    });
+                }    
+            };
+
+            // Attach an event listener to the delete button
+
+            deleteButton.onclick = async () => {
+                const replyData = await this.orm.searchRead("pdf.reply.annotation", [
+                    ["annotation_id", "=", rowId],
+                    ["unique_button", "=", buttonId],
+                    ["delete_unique_button", "=", deletebuttonId],
+                ]);
+                console.log('Reply Data to be unlinked!!!!:', replyData);
+                const secondConfirmation = confirm("Are you sure you want to delete this reply?");
+                if (secondConfirmation) {
+                    newDiv.remove();
+                    // Delete the reply from the backend
+                    if (replyData.length > 0) {
+                        this.orm.unlink("pdf.reply.annotation", [replyData[0].id]);
+                    }
+                }
+            };
+
+        };
+    }
+    
+
     initializeSaveMarker(tr, rowId) {
         const inputField = tr.querySelector('.table_tbody_input');
-        inputField.onchange = () => {
+        inputField.onchange = () => 
+            {
             this.updateLine(rowId, { description: inputField.value });
         };
     }
+
+    // initializeSaveReply(tr, rowId) {
+    //     const replyField = tr.querySelector('.table_tbody_reply');
+    //     if (!replyField) {
+    //         console.error('Reply field not found');
+    //         return;
+    //     }
+    //     replyField.onchange = () =>
+    //         {
+    //             console.log('Reply Field:',replyField.value);
+    //         this.updateReply(6, { reply: replyField.value });
+    //     };
+    // }
 
     onScrollPage() {
         const pages = document.getElementById('pdf-container').querySelectorAll('[id^="page-"]');

@@ -10,23 +10,23 @@
                             <div id="page-list" style="overflow-y: auto;max-height: 90vh;"/>
                         </div>
                         <div class="col-sm-7">
-                            <div id="pdf-container"/>
-                        </div>
-                        <div class="col-sm-3" id="description_container">
-                            <div class="row">
-                                <div class="col-sm-2">
+                            <div class="d-flex justify-content-center my-2">
+                                <div class="col-sm-1">
                                     <button id="highlightIcon" class="fa fa-pencil btn btn-warning" title="Highlight Mode"/>
                                 </div>
-                                <div class="col-sm-2">
+                                <div class="col-sm-1">
                                     <button id="annotateIcon" class="fa fa-comment btn btn-danger" title="Annotate Mode"/>
                                 </div>
-                                <div class="col-sm-2">
+                                <div class="col-sm-1">
                                     <button id="drawIcon" class="fa fa-paint-brush btn btn-info" title="Drawing Mode"/>
                                 </div>
-                                <div class="col-sm-2">
+                                <div class="col-sm-1">
                                     <button id="undoIcon" class="fa fa-undo btn btn-primary" title="Undo Last Drawing"/>
                                 </div>
                             </div>
+                            <div id="pdf-container"/>
+                        </div>
+                        <div class="col-sm-3 my-2" id="description_container">
                             <table class="table">
                                 <!-- <thead class="sticky-top">
                                     <tr>

@@ -2,3 +2,4 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_product_pdf_annotation_line,access_product_pdf_annotation_line,model_product_pdf_annotation_line,base.group_user,1,1,1,1
 access_pdf_highlight_marker_id,access_pdf_highlight_marker,model_pdf_highlight_marker,base.group_user,1,1,1,1
 access_drawing_data_id,access_drawing_data,model_drawing_data,base.group_user,1,1,1,1
+access_pdf_annotation_reply_id,access_pdf_annotation_reply,model_pdf_reply_annotation,base.group_user,1,1,1,1

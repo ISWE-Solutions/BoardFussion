@@ -6,7 +6,7 @@ class DrawingData(models.Model):
 
     page_no = fields.Char('Page No')
     drawing_data = fields.Text(string="Drawing Data")
-    document_id = fields.Many2one('product.document', string="Document")
+    document_id = fields.Many2one('product.document', string="Document", ondelete='cascade')
 
     @api.model
     def save_drawing_data(self, record_id, drawing_data):
