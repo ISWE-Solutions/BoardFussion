@@ -63,6 +63,7 @@ Long description of module's purpose
         'web.assets_backend': [
             'odoo_calendar_inheritence/static/src/js/custom_confirm.js',
             'odoo_calendar_inheritence/static/src/js/calendar_event_restriction.js',
+            'odoo_calendar_inheritence/static/src/js/action_board_knowledge',
             'odoo_calendar_inheritence/static/src/css/agenda_lines.css',
         ],
     },

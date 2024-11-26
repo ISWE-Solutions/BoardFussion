@@ -12,6 +12,7 @@ from PIL import Image
 from lxml import etree, html
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
+
 _logger = logging.getLogger(__name__)
 
 CLOSED_STATES = {
@@ -121,7 +122,6 @@ class OdooCalendarInheritence(models.Model):
     #     string="Document visibility",
     #     tracking=True
     # )
-
 
     # is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
     #
@@ -243,6 +243,7 @@ class OdooCalendarInheritence(models.Model):
             raise ValueError("Invalid image content")
 
         return "data:%s;base64,%s" % (Image.MIME[image.format], value.decode('ascii'))
+
 
     def create_article_calendar(self):
         if not self.product_line_ids:

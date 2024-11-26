@@ -10,7 +10,7 @@
             </xpath>
             <xpath expr="//button[@name='action_toggle_favorite']" position="replace"/>
             <xpath expr="//button[@name='action_toggle_favorite']" position="replace"/>
-<!--            <xpath expr="//button[@name='action_toggle_favorite'][2]" position="replace"/>-->
+            <!--            <xpath expr="//button[@name='action_toggle_favorite'][2]" position="replace"/>-->
         </field>
     </record>
 
@@ -35,6 +35,8 @@
             </xpath>
         </field>
     </record>
+
+
     <!--    <record id="knowledge.knowledge_article_action"/>-->
     <record id="knowledge.knowledge_article_action" model="ir.actions.act_window">
         <field name="name">Board Pack</field>

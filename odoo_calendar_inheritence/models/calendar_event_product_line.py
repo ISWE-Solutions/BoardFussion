@@ -1,7 +1,10 @@
 from markupsafe import Markup
 from odoo import models, fields, _, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, AccessError
 import base64
+import logging
+
+_logger = logging.getLogger()  
 
 class CalendarEventProductLine(models.Model):
     _name = 'calendar.event.product.line'
@@ -27,15 +30,25 @@ class CalendarEventProductLine(models.Model):
         'res.partner',
         'calendar_event_product_line_res_partner_rel',  # Unique relation table name
         string="Document Restricted Visibility",
-        store=True
+        compute="_compute_restricted_attendees",
+        store=True,
+        readonly =False,
     )
 
     is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
 
+    @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id')  # Include creator in dependencies
+    def _compute_restricted_attendees(self):
+        for record in self:
+            if record.calendar_id:
+                # Combine attendees and the creator of the event
+                attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
+                record.Restricted = attendees_and_creator
+
     @api.depends('Restricted')
     def _compute_is_user_restricted(self):
         for record in self:
-            record.is_user_restricted = self.env.user.partner_id in record.Restricted
+            record.is_user_restricted = self.env.user.partner_id not in record.Restricted
 
     document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
 
@@ -70,7 +83,7 @@ class CalendarEventProductLine(models.Model):
 
         if 'agenda' in values and values['agenda']:
             self._check_unique_agenda(values['agenda'], self.id)
-        # print('------------------->',values)
+        # _logger.info('------------------->',values)
         if 'pdf_attachment' in values:
             create_doc=[]
             create_list_ids=[]
@@ -104,14 +117,14 @@ class CalendarEventProductLine(models.Model):
                     doc_res = self.env['product.document'].sudo().create(create_doc)
             if unlink_list_ids:
                 res=self.env['product.document'].sudo().search([('ir_attachment_id','in',unlink_list_ids)])
-                # print('Unlink--',res)
+                # _logger.info('Unlink--',res)
                 if res:
                     res.sudo().unlink()
                 # attachment_data = attachment.datas
                 # attachment_bytes = base64.b64encode(attachment_data)
         self.calendar_id.compute_visible_users()
         res=super(CalendarEventProductLine, self).write(values)
-        # print(res)
+        # _logger.info(res)
         return res
 
 
@@ -149,7 +162,7 @@ class CalendarEventProductLine(models.Model):
         html = Markup('<a href="/web?#active_id=%d&amp;action=qxm_product_pdf_annotation_tool.product_pdf_annotation&amp;cids=%d" style="padding: 5px 10px; color: #FFFFFF; text-decoration: none; background-color: #875A7B; border: 1px solid #875A7B; border-radius: 3px">View</a>') % (active_id, company_id)
         vals = {'name': "PDF test", 'body': html}
         res = self.env['knowledge.article'].sudo().create(vals)
-        # print(res)
+        # _logger.info(res)
 
     def _check_unique_agenda(self, agenda, exclude_id=None):
         domain = [('agenda', '=', agenda)]
@@ -175,14 +188,18 @@ class CalendarEventProductLine(models.Model):
         # Collect the attachment IDs from the `pdf_attachment` field.
         attachment_ids = self.pdf_attachment.ids
 
-        # Debug prints to track values
-        print("Company ID:", company_id)
-        print("Current Product Line ID:", self.id)
-        print("Attachment IDs in pdf_attachment:", attachment_ids)
+        # Debug logs
+        _logger.info(f"Company ID: {company_id}")
+        _logger.info(f"Current Product Line ID: {self.id}")
+        _logger.info(f"Attachment IDs in pdf_attachment: {attachment_ids}")
 
         # Check if there are any matching product documents
         matching_documents = self.env['product.document'].search([('ir_attachment_id', 'in', attachment_ids)])
-        print("Matching Product Document IDs:", matching_documents.ids)
+        _logger.info(f"Matching Product Document IDs: {matching_documents.ids}")
+
+        # Allow action only if the user is NOT restricted
+        if self.is_user_restricted:
+            raise AccessError(_("You are not allowed to view these documents."))
 
         return {
             'name': _('Documents'),

@@ -1,5 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from odoo import http
+from odoo.http import request
 
 
 class KnowledgeArticle(models.Model):
@@ -9,6 +11,9 @@ class KnowledgeArticle(models.Model):
     product_id = fields.Many2one('product.template', string='Product')
     body = fields.Html(string='Content', sanitize=True)
     is_minutes_of_meeting = fields.Boolean(default=False)
+    product_line_ids = fields.One2many(
+        'calendar.event', 'article_id', string="Product Lines"
+    )
 
     def action_open_documents(self):
         # self.ensure_one()
@@ -67,6 +72,16 @@ class KnowledgeArticle(models.Model):
                     _("Use this feature to store Documents you would like to share with your members"),
                 )
             }
+
+    def your_custom_method(self):
+        # Your custom logic here
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Custom Action',
+            'view_mode': 'form',
+            'res_model': 'some.model',
+            'target': 'new',
+        }
 
     # @api.model
     # def create_article_with_attachments(self, name, attachment_ids):

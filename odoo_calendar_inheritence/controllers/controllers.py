@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import http
+from odoo.http import request
 
 
 class OdooCalendarInheritence(http.Controller):
@@ -20,3 +21,17 @@ class OdooCalendarInheritence(http.Controller):
             'object': obj
         })
 
+
+class KnowledgeArticleController(http.Controller):
+    @http.route('/trigger_action', type='json', auth='user', methods=['POST'])
+    def trigger_action(self, article_id):
+        try:
+            # Get the article record by ID
+            article = request.env['knowledge.article'].browse(article_id)
+
+            # Call your custom function or logic here
+            article.create_article_calendar()
+
+            return {'message': 'Action executed successfully'}
+        except Exception as e:
+            return {'error': str(e)}
