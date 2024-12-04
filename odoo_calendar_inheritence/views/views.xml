@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="action_point_form_view" model="ir.ui.view">
+        <field name="name">action.point.form.view</field>
+        <field name="model">calendar.event</field>
+        <field name="arch" type="xml">
+            <form>
+                <field name="company_id" invisible="1"/>
+                <field name="new_task_name"/>
+                <field name="user_ids"/>
+                <field name="date_deadline"/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_point_tree_view" model="ir.ui.view">
+        <field name="name">action.point.tree.view</field>
+        <field name="model">calendar.event</field>
+        <field name="arch" type="xml">
+            <tree editable="bottom">
+                <field name="company_id" column_invisible="1"/>
+                <field name="new_project_id"
+                       readonly="1" force_save="1"
+                />
+                <field name="new_task_name"/>
+                <field name="stage_id"/>
+                <field name="user_ids" widget="many2many_tags"/>
+                <field name="date_deadline"/>
+                <button name="action_create_task" string="Create Task" type="object"
+                        class="oe_highlight" invisible="task_id"/>
+                <button name="action_view_task" invisible="not task_id" string="View Task" type="object"
+                        class="oe_link"/>
+                <field name="task_id" string="View Task" readonly="1" column_invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- <record id="action_action_point" model="ir.actions.act_window">
+        <field name="name">Action Point</field>
+        <field name="res_model">calendar.event</field>
+        <field name="view_mode">tree</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Agenda!
+            </p>
+        </field>
+    </record> -->
+
+    <record id="action_action_point" model="ir.actions.act_window">
+        <field name="name">Action Points</field>
+        <field name="res_model">calendar.event</field>
+        <field name="view_mode">tree</field>
+        <field name="domain">[('parent_id', '=', active_id)]</field>
+        <field name="context">{'default_parent_id': active_id}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Subtask!
+            </p>
+        </field>
+    </record>
+
+
+    <record id="calendar_appointment_form_view_inherit" model="ir.ui.view">
+        <field name="name">calendar.appointment.form.view.inherit</field>
+        <field name="model">calendar.event</field>
+        <field name="inherit_id" ref="appointment.calendar_event_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form//field[@name='appointment_type_id']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="calendar_alarm_form_view" model="ir.ui.view">
+        <field name="name">calendar.alarm.form.view</field>
+        <field name="model">calendar.event</field>
+        <field name="inherit_id" ref="calendar.view_calendar_event_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='description']" position="after">
+                <field name="product_id" invisible="1"/>
+            </xpath>
+            <xpath expr="//field[@name='description']" position="after">
+                <field name="product_id" invisible="1"/>
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <field name="company_id" invisible="1"/>
+                <field name="project_id"
+                       invisible="1"
+                />
+                <!--                <field name="is_user_restricted" invisible="1"/>-->
+                <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
+                        icon="fa-file-text-o">
+                    <field name="document_count" widget="statinfo" string="Document"/>
+                </button>
+                <button class="oe_stat_button" type="object" invisible="not article_exists"
+                        name="action_view_knowledge_article"
+                        icon="fa-external-link" string="View Board Pack" confirm="Do you want to proceed ?">
+                </button>
+
+                 <button class="oe_stat_button" type="object"
+                        name="action_view_documents"
+                        icon="fa-external-link" string="View NEW BP">
+                </button>
+
+                <button class="oe_stat_button" name="action_create_agenda_descriptions" type="object"
+                        string="View minutes"
+                        icon="fa-external-link" confirm="Do you want to proceed ?"
+                        invisible="not is_description_created">
+                </button>
+                <button class="oe_stat_button" type="action" name="%(odoo_calendar_inheritence.action_attendees_lines)d"
+                        context="{'default_calendar_id': active_id}" icon="fa-calendar"
+                        invisible="not has_attendees_added">
+                    <field string="Attendees" name="mom_lines_count" widget="statinfo"/>
+                </button>
+                <button class="oe_stat_button" name="action_points_kanban" type="object" icon="fa-tasks"
+                        invisible="not has_attendees_added">
+                    <field string="Action Points" name="action_point_count" widget="statinfo"/>
+                </button>
+            </xpath>
+            <!--            <xpath expr="//button[@name='action_open_composer']" position="replace"/>-->
+            <xpath expr="//button[@name='action_send_sms']" position="replace"/>
+            <xpath expr="//page[@name='page_invitations']//button[@name='action_sendmail']" position="replace">
+                <button name="action_open_custom_composer" help="Send Email to attendees" type="object" string="EMAIL"
+                        icon="fa-envelope" invisible="not user_can_edit"/>
+            </xpath>
+            <!--            <xpath expr="//page[@name='page_invitations']" position="attributes">-->
+            <!--                <attribute name="invisible">1</attribute>-->
+            <!--            </xpath>            -->
+
+            <xpath expr="//field[@name='show_as']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='privacy']" position="attributes">
+                <attribute name="invisible">0</attribute>
+            </xpath>
+
+
+            <xpath expr="//page[@name='page_invitations']" position="replace">
+                <page name="page_invitations" string="Invitations" invisible="not product_id">
+                    <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
+                            class="oe_link"/>
+                    <field name="attendee_ids" widget="one2many" mode="tree" readonly="1">
+                        <tree string="Invitation details" editable="top" create="false" delete="false">
+                            <field name="partner_id"/>
+                            <field name="email" widget="email"/>
+                            <field name="phone" widget="phone"/>
+                            <field name="state"/>
+                        </tree>
+                        <kanban class="o_kanban_mobile" create="false" delete="false">
+                            <field name="partner_id"/>
+                            <field name="state"/>
+                            <field name="email" widget="email"/>
+
+                            <templates>
+                                <t t-name="kanban-box">
+                                    <div class="d-flex flex-column justify-content-between">
+                                        <field name="partner_id"/>
+                                        <field name="email" widget="email"/>
+                                        <span>Status:
+                                            <field name="state"/>
+                                        </span>
+
+                                        <div class="text-end">
+                                            <button name="do_tentative"
+                                                    invisible="state not in ('needsAction', 'declined', 'accepted')"
+                                                    string="Uncertain" type="object" class="btn fa fa-asterisk"/>
+                                            <button name="do_accept"
+                                                    invisible="state not in ('needsAction', 'tentative', 'declined')"
+                                                    string="Accept" type="object" class="btn fa fa-check text-success"/>
+                                            <button name="do_decline"
+                                                    invisible="state not in ('needsAction', 'tentative', 'accepted')"
+                                                    string="Decline" type="object"
+                                                    class="btn fa fa-times-circle text-danger"/>
+                                        </div>
+                                    </div>
+                                </t>
+                            </templates>
+                        </kanban>
+                    </field>
+                </page>
+            </xpath>
+            <xpath expr="//page[@name='page_invitations']" position="after">
+                <page name="agenda" string="Meeting Agenda" invisible="not product_id">
+                    <field name="product_line_ids" widget="one2many"
+                           context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
+                        <tree>
+                            <control>
+                                <create string="Add Agenda"/>
+                            </control>
+                            <!--                            <field name="product_id"/>-->
+                            <field name="sequence" widget="handle"/>
+                            <field name="agenda" column_invisible='True'/>
+                            <field name="description" string="Agenda Item"/>
+                            <field name="presenter_id" widget="many2many_tags"/>
+                            <field name="is_user_restricted" column_invisible="1"/>
+                            <!--                            <field name="Restricted" widget="many2many_tags" column_invisible="0" />-->
+                            <!--                            <field name="document_names" string="Document Names"/>-->
+                            <button name="action_open_documents" string="Attachments" type="object"
+                                    icon="fa-file-text-o" invisible="is_user_restricted, '=', False"/>
+                        </tree>
+                    </field>
+                    <div>
+                        <field name="article_exists" invisible="1"/>
+                        <!--                        <button string="Create Board Pack" name="action_create_html_all" type="object"-->
+                        <!--                                class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"-->
+                        <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
+
+                        <button name="create_article_calendar" type="object" string="Create Board Pack"
+                                class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
+                                confirm="Do you want to create board pack?"/>
+
+                        <button name="action_merge_documents" type="object" string="New Board Pack"
+                                class="btn btn-primary m-1" icon="fa-plus"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
+                                />
+
+
+                        <button string="Update Board Pack" invisible="not article_exists"
+                                name="action_add_knowledge_article" type="object"
+                                class="btn btn-success m-1" icon="fa-plus"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
+                                confirm="Do you want to update the board pack?"/>
+                    </div>
+                </page>
+                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
+                    <field name="has_attendees_added" invisible="1"/>
+                    <field name="has_attendees_confirmed" invisible="1"/>
+                    <field name="is_description_created" invisible="1"/>
+                    <button name="action_create_agenda_descriptions" type="object" string="Generate minutes"
+                            class="btn btn-warning m-1" icon="fa-external-link" confirm="Do you want to proceed ?"
+                            invisible="is_description_created"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                    <button/>
+                    <button name="action_open_documents" type="object" string="Upload Minutes"
+                            class="btn btn-primary" icon="fa-paperclip" confirm="Do you want to proceed ?"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                    <!--                    <button name="action_create_agenda_descriptions" type="object" string="View minutes"-->
+                    <!--                            class="btn btn-warning m-1" icon="fa-external-link" confirm="Do you want to proceed ?"-->
+                    <!--                            invisible="not is_description_created"/>-->
+                    <group string="Meeting Attendees">
+                    </group>
+                    <field name="attendees_lines_ids" readonly="has_attendees_confirmed" widget="one2many">
+                        <tree editable="bottom" delete="0" create="0">
+                            <field name="attendee_name" readonly="1" force_save="1"/>
+                            <field name="email" widget="email"/>
+                            <field name="phone" widget="phone"/>
+                            <field name="has_attended" string="Attendend?" force_save="1"/>
+                        </tree>
+                    </field>
+
+                    <button name="action_add_attendees" string="Mark Attendance" type="object" class="btn btn-primary"
+                            confirm="Do you want to proceed ?" invisible="has_attendees_added"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                    <button name="action_reset_attendees" string="Reset Attendees" type="object" class="btn btn-primary"
+                            confirm="Do you want to proceed ?" invisible="not has_attendees_added"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--    # A Way to Hide Save & New Button from one2many field form view!-->
+    <record id="calendar_event_product_line_form_view_extended" model="ir.ui.view">
+        <field name="name">calendar.event.product.line.form.view.extended</field>
+        <field name="model">calendar.event.product.line</field>
+        <field name="inherit_id" ref="odoo_calendar_inheritence.calendar_event_product_line_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <style>
+                    .btn-primary:nth-child(2){
+                    display:none !important;
+                    }
+                </style>
+            </xpath>
+        </field>
+    </record>
+</odoo>
