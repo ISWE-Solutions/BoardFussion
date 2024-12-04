@@ -1,8 +1,0 @@
-<odoo>
-    <data>
-        <record id="product_category_dummy" model="product.category">
-            <field name="name">Dummy</field>
-            <field name="parent_id" ref="product.product_category_all"/>
-        </record>
-    </data>
-</odoo>
