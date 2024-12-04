@@ -1,8 +1,10 @@
+from PyPDF2 import PdfReader, PdfWriter
 from markupsafe import Markup
 from bs4 import BeautifulSoup
 import base64
 from datetime import time
 import logging
+import io
 import re
 from io import BytesIO
 import babel
@@ -12,6 +14,16 @@ from PIL import Image
 from lxml import etree, html
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
+from docx import Document
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowable, ListItem
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from xml.sax.saxutils import escape
+from weasyprint import HTML
 
 _logger = logging.getLogger(__name__)
 
@@ -1005,6 +1017,236 @@ class OdooCalendarInheritence(models.Model):
         # Perform standard duplication
         print("Performing standard duplication...")
         return super(OdooCalendarInheritence, self).copy(default)
+
+    def image_to_pdf(self, image_data):
+        """
+        Convert image data to a PDF binary.
+        """
+        from io import BytesIO
+        from reportlab.pdfgen import canvas
+
+        # Decode the base64 image data
+        image_stream = BytesIO(base64.b64decode(image_data))
+        image = ImageReader(image_stream)
+
+        # Create a PDF in memory
+        buffer = BytesIO()
+        pdf_canvas = canvas.Canvas(buffer)
+
+        # Get image dimensions
+        width, height = image.getSize()
+
+        # Set the page size to match the image dimensions
+        pdf_canvas.setPageSize((width, height))
+
+        # Draw the image on the canvas
+        pdf_canvas.drawImage(image, 0, 0, width=width, height=height)
+
+        pdf_canvas.save()
+
+        # Return the binary PDF content
+        buffer.seek(0)
+        return buffer.read()
+
+    def docx_to_pdf(self, docx_data):
+        """
+        Convert a DOCX file (binary data) to a properly formatted PDF
+        with support for text alignment, spacing, and list numbering/bullets.
+        """
+        # Decode and load the DOCX file from base64-encoded data
+        doc = Document(BytesIO(base64.b64decode(docx_data)))
+
+        # Prepare a PDF stream to write to
+        pdf_stream = BytesIO()
+        pdf = SimpleDocTemplate(
+            pdf_stream,
+            pagesize=letter,
+            leftMargin=inch,
+            rightMargin=inch,
+            topMargin=inch,
+            bottomMargin=inch,
+        )
+
+        # Define styles for the PDF
+        styles = getSampleStyleSheet()
+
+        # Add custom styles only if they are not already defined
+        if 'Center' not in styles:
+            styles.add(ParagraphStyle(name='Center', alignment=1))  # Center-aligned
+        if 'Right' not in styles:
+            styles.add(ParagraphStyle(name='Right', alignment=2))  # Right-aligned
+        if 'Bold' not in styles:
+            styles.add(ParagraphStyle(name='Bold', fontName='Helvetica-Bold'))  # Bold text
+        # Do not add 'Italic' since it already exists in the default stylesheet
+
+        story = []  # Content for the PDF
+
+        # Track list numbering
+        list_counter = 1
+        roman_counter = 1
+
+        for paragraph in doc.paragraphs:
+            # Skip empty paragraphs
+            if not paragraph.text.strip():
+                continue
+
+            # Determine alignment
+            if paragraph.alignment == 1:  # Center-aligned
+                style = styles['Center']
+            elif paragraph.alignment == 2:  # Right-aligned
+                style = styles['Right']
+            else:  # Default to left-aligned
+                style = styles['BodyText']
+
+            # Build the formatted text
+            formatted_text = ""
+            for run in paragraph.runs:
+                text = escape(run.text)  # Escape special characters
+                if run.bold:
+                    formatted_text += f"<b>{text}</b>"
+                elif run.italic:
+                    formatted_text += f"<i>{text}</i>"
+                else:
+                    formatted_text += text
+
+            # Handle list paragraphs
+            if paragraph.style.name.lower().startswith('list'):
+                if "roman" in paragraph.style.name.lower():  # Roman numeral lists
+                    formatted_text = f"{roman_counter}. {formatted_text}"
+                    roman_counter += 1
+                else:  # Regular numbered lists
+                    formatted_text = f"{list_counter}. {formatted_text}"
+                    list_counter += 1
+
+                # Add as a list item
+                story.append(ListFlowable([ListItem(Paragraph(formatted_text, style))], bulletType='bullet'))
+            else:
+                # Reset counters for non-list paragraphs
+                list_counter = 1
+                roman_counter = 1
+
+                # Add the paragraph
+                story.append(Paragraph(formatted_text, style))
+
+            # Add spacing between paragraphs
+            story.append(Spacer(1, 0.2 * inch))
+
+        # Build the PDF document
+        pdf.build(story)
+
+        # Retrieve the binary PDF content
+        pdf_stream.seek(0)
+        return pdf_stream.read()
+
+    def html_to_pdf(self, html_content):
+        """
+        Convert HTML content to a PDF using a library like `weasyprint` or `wkhtmltopdf`.
+        """
+        pdf_stream = io.BytesIO()
+        HTML(string=html_content).write_pdf(pdf_stream)
+        pdf_stream.seek(0)
+        return pdf_stream.getvalue()
+
+    def add_media_placeholder(pdf_writer, media_files):
+        """
+        Add placeholders for media files in the merged PDF.
+        """
+        from reportlab.pdfgen import canvas
+
+        for media_file in media_files:
+            pdf_page = io.BytesIO()
+            pdf_canvas = canvas.Canvas(pdf_page)
+            pdf_canvas.drawString(50, 750, f"Media File: {media_file.name}")
+            pdf_canvas.drawString(50, 730, f"File Type: {media_file.mimetype}")
+            pdf_canvas.drawString(50, 710, "Media files cannot be embedded.")
+            pdf_canvas.save()
+            pdf_page.seek(0)
+
+            pdf_reader = PdfReader(pdf_page)
+            for page in pdf_reader.pages:
+                pdf_writer.add_page(page)
+
+    def action_merge_documents(self):
+        """
+        Merge all supported attachments (PDFs, images, DOCX) from the product lines of the event into a single document.
+        """
+        self.ensure_one()
+
+        attachments = self.mapped('product_line_ids.pdf_attachment')
+        if not attachments:
+            raise UserError(_("No attachments found to merge."))
+
+        pdf_writer = PdfWriter()
+
+        for attachment in attachments:
+            if attachment.mimetype == 'application/pdf':
+                # Add PDF to writer
+                pdf_data = base64.b64decode(attachment.datas)
+                pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                for page in pdf_reader.pages:
+                    pdf_writer.add_page(page)
+            elif attachment.mimetype.startswith('image/'):
+                # Convert image to PDF and add
+                pdf_data = self.image_to_pdf(attachment.datas)
+                pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                for page in pdf_reader.pages:
+                    pdf_writer.add_page(page)
+            elif attachment.mimetype == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                # Convert DOCX to PDF and add
+                pdf_data = self.docx_to_pdf(attachment.datas)
+                pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                for page in pdf_reader.pages:
+                    pdf_writer.add_page(page)
+            else:
+                # Add placeholder for unsupported media files
+                self.add_media_placeholder(pdf_writer, [attachment])
+
+        if not pdf_writer.pages:
+            raise UserError(_("No valid documents found in attachments."))
+
+        # Write the merged PDF to a stream
+        merged_pdf_stream = io.BytesIO()
+        pdf_writer.write(merged_pdf_stream)
+        merged_pdf_stream.seek(0)
+
+        # Create a new attachment with the merged content
+        merged_attachment = self.env['ir.attachment'].create({
+            'name': f'Merged Document - {self.name}.pdf',
+            'type': 'binary',
+            'datas': base64.b64encode(merged_pdf_stream.read()),
+            'mimetype': 'application/pdf',
+            'res_model': 'calendar.event',
+            'res_id': self.id,
+        })
+
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/{merged_attachment.id}',
+            'target': 'new',
+        }
+
+    def action_view_documents(self):
+        self.ensure_one()
+
+        # Collect all `pdf_attachment` documents from the product lines
+        attachment_ids = self.mapped('calendar_event_product_line_ids.pdf_attachment').ids
+
+        if not attachment_ids:
+            raise ValidationError(_("No documents available to view."))
+
+        # Open the documents in a list view
+        return {
+            'name': _('Documents'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'ir.attachment',
+            'view_mode': 'kanban,tree,form',
+            'domain': [('id', 'in', attachment_ids)],
+            'target': 'current',
+            'context': {
+                'default_res_model': 'calendar.event',
+                'default_res_id': self.id,
+            },
+        }
 
 
 class AgendaLines(models.Model):
