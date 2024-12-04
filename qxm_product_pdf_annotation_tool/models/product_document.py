@@ -25,6 +25,7 @@ class ProductDocument(models.Model):
             'params': {},
         }
 
+
     def get_document_data(self):
         data = self.sudo().read()
         lines = self.env['product.pdf.annotation.line'].sudo().search_read([('document_id', '=', self.sudo().id)], [])

@@ -14,7 +14,10 @@
             <field name="shown_on_product_page" position="after">
                 <button name="action_open_pdf_annotation" id="open_pdf_annotation" string="PDF Annotation" type="object" invisible="not shown_on_product_page or mimetype != 'application/pdf'"/>
             </field>
+
         </field>
     </record>
+
+
 
 </odoo>
