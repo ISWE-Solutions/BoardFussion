@@ -6,6 +6,25 @@ class User(models.Model):
 
     member_type = fields.Selection(related='employee_id.member_type', string='Member Type', readonly=False, store=True)
 
+    def write(self, vals):
+        res = super(User, self).write(vals)
+
+        # Fields to propagate
+        fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
+        for user in self:
+            for field in fields_to_sync:
+                if field in vals:
+                    # Update related employee
+                    employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
+                    if employee:
+                        employee.write({field: vals[field]})
+
+                    # Update related partner
+                    if user.partner_id:
+                        user.partner_id.write({field: vals[field]})
+
+        return res
+
     def toggle_active(self):
         super().toggle_active()  # Call the parent method
 
@@ -65,12 +84,3 @@ class User(models.Model):
                     print(f"No active partners found related to user {user.login}.")
 
         # Note: Do not call super().unlink() since we are archiving instead of deleting
-
-
-
-
-
-
-
-
-
