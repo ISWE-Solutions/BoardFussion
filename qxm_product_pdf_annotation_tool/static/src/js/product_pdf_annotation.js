@@ -4,6 +4,7 @@ import { Component, onMounted, onWillStart, useRef} from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { Layout } from "@web/search/layout";
 import { useService } from "@web/core/utils/hooks";
+import { session } from "@web/session";
 
 class ProductPDFAnnotation extends Component {
     static template = "qxm_product_pdf_annotation_tool.ProductPDFAnnotation";
@@ -94,6 +95,8 @@ class ProductPDFAnnotation extends Component {
         this.initializeHighlightMarkers(pageNum, canvasWrapper, canvas);
         this.initializeCanvas(pageNum, canvasWrapper, canvas);
         this.initializeUndo(pageNum, canvasWrapper, canvas);  
+        // console.log('This Session:',session)
+        console.log('This Session User Id:',session.uid)
     }
 
     createPageDiv(pageNum) {
@@ -204,15 +207,15 @@ class ProductPDFAnnotation extends Component {
                 console.log(line_data);
                 const user_name= line_data[0].user_id[1];
                 // console.log(user_name);
-                this.createMarkerDOM(x, y, "", line_id,user_name, canvasWrapper, pageNum, line_count);
+                this.createMarkerDOM(x, y, "", line_id,line_data[0].user_id, canvasWrapper, pageNum, line_count);
             });
         
 
         const lines = this.data.lines[pageNum] || [];
         for (const line of lines) {
             line_count += 1;
-            // console.log('LINES---> ',line.replies);
-            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id[1],canvasWrapper, pageNum, line_count, line.replies);
+            console.log('LINES---> ',line.user_id);
+            this.createMarkerDOM(line.layerx, line.layery, line.description || "", line.id,line.user_id,canvasWrapper, pageNum, line_count, line.replies);
         }
     }
 
@@ -664,14 +667,19 @@ class ProductPDFAnnotation extends Component {
     // }
 
     createTableRow(rowId, description, user, pageNumber, lineNumber, markerDiv, reply_ids) {
+        // console.log('Session User ID:',session.uid);
+        // console.log('Table Row User ID', user[0]);
         const tr = document.createElement('tr');
         tr.id = `table_line_${rowId}`;
         tr.className = 'table_tr_line';
-        tr.innerHTML = `
+
+        if (session.uid === user[0]) {
+            console.log('User is the same');
+            tr.innerHTML = `
             <td>
                 <div class="annotation-details">
                     <div><strong>Page:</strong> <span>${pageNumber}</span></div>
-                    <div><strong>User:</strong> <span>${user}</span></div>
+                    <div><strong>User:</strong> <span>${user[1]}</span></div>
                     <div><strong>Comment:</strong></div>
                     <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Comment ..">${description}</textarea>
                     <div class="text-end pt-2"><i class="fa fa-trash delete_marker" style="cursor: pointer;" aria-hidden="true"></i></div>
@@ -681,6 +689,24 @@ class ProductPDFAnnotation extends Component {
                 </div>
             </td>
         `;
+        }
+        else {
+            console.log('User is different');
+            tr.innerHTML = `
+            <td>
+                <div class="annotation-details">
+                    <div><strong>Page:</strong> <span>${pageNumber}</span></div>
+                    <div><strong>User:</strong> <span>${user[1]}</span></div>
+                    <div><strong>Comment:</strong></div>
+                    <textarea readonly="1" class="form-control table_tbody_input custom-description-textarea" placeholder="Comment ..">${description}</textarea>
+                    <div class="text-end pt-2"><i class="fa fa-trash delete_marker d-none" style="cursor: pointer;" aria-hidden="true" ></i></div>
+                </div>
+                <div>
+                    <button id="replyIcon" class="reply_button btn btn-primary" title="Add a reply for this annotation">Add Reply</button>
+                </div>
+            </td>
+        `;
+        }
         // loop through reply_ids
         if (reply_ids) {
         for (const reply_id of reply_ids) {
@@ -713,17 +739,37 @@ class ProductPDFAnnotation extends Component {
             console.log(`Unique ID FOR SAVE BUTTON!!!: ${uniqueId}`);
             console.log(`Unique ID FOR DELETE BUTTON!!!: ${deleteuniqueId}`);
 
-            newDiv.innerHTML = `
-            <div>
-                <div><strong>Reply:</strong></div>
-                <div><strong>User:</strong> <span>${reply_id.user_id[1]}</span></div>
-                <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here...">${reply_id.reply}</textarea>
-            </div>
-            <div class="text-end pt-2">
-                <button id="${deleteuniqueId}" class="reply-delete-button fa fa-trash" title="Delete this reply." aria-hidden="true"></button>
-                <button id="${uniqueId}" class="reply-save-button btn btn-success fa fa-share-square" title="Save this reply" ></button>
-            </div>
-        `;
+            if (reply_id.user_id[0] === session.uid){
+                console.log('Reply User is the same');
+                newDiv.innerHTML = `
+                <div>
+                    <div><strong>Reply:</strong></div>
+                    <div><strong>User:</strong> <span>${reply_id.user_id[1]}</span></div>
+                    <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here...">${reply_id.reply}</textarea>
+                </div>
+                <div class="text-end pt-2">
+                    <button id="${deleteuniqueId}" class="reply-delete-button fa fa-trash" title="Delete this reply." aria-hidden="true"></button>
+                    <button id="${uniqueId}" class="reply-save-button btn btn-success fa fa-share-square" title="Save this reply" ></button>
+                </div>
+            `;
+            } 
+            else {
+                console.log('Reply User is different');
+                newDiv.innerHTML = `
+                <div>
+                    <div><strong>Reply:</strong></div>
+                    <div><strong>User:</strong> <span>${reply_id.user_id[1]}</span></div>
+                    <textarea readonly="1" class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here...">${reply_id.reply}</textarea>
+                </div>
+                <div class="text-end pt-2">
+                    <button id="${deleteuniqueId}" class="reply-delete-button fa fa-trash d-none" title="Delete this reply." aria-hidden="true"></button>
+                    <button id="${uniqueId}" class="reply-save-button btn btn-success fa fa-share-square d-none" title="Save this reply" ></button>
+                </div>
+            `;
+            }
+            
+
+
 
             // replyIcon.insertAdjacentHTML('beforebegin',newDiv.innerHTML);
     
@@ -773,7 +819,8 @@ class ProductPDFAnnotation extends Component {
                         annotation_id: rowId,
                         unique_button: buttonId,
                         delete_unique_button: deletebuttonId,
-                        reply: replyText
+                        reply: replyText,
+                        user_id: session.uid,
                     }]);
                 }
 
@@ -816,7 +863,7 @@ class ProductPDFAnnotation extends Component {
         markerDiv.onmouseout = () => this.removeHoverEffect();
         markerDiv.onclick = () => this.scrollToElement(tr);
     
-        this.initializeDeleteMarker(tr, markerDiv, rowId);
+        this.initializeDeleteMarker(tr, markerDiv, rowId, user);
         this.initializeSaveMarker(tr, rowId);
         this.initializeReply(tr,rowId,user);
     
@@ -900,6 +947,8 @@ class ProductPDFAnnotation extends Component {
     
         replyIcon.onclick = () => {
             console.log('Reply Clicked');
+            console.log('Session User Name:',session.name);
+            // console.log('User Clicked Reply:',user);
     
             // Locate the <td> containing the reply button
             const parentTd = replyIcon.closest('td');
@@ -919,7 +968,7 @@ class ProductPDFAnnotation extends Component {
             newDiv.innerHTML = `
                 <div>
                     <div><strong>Reply:</strong></div>
-                    <div><strong>User:</strong> <span>${user}</span></div>
+                    <div><strong>User:</strong> <span>${session.name}</span></div>
                     <textarea class="form-control table_tbody_input custom-description-textarea" placeholder="Enter your reply here..."></textarea>
                 </div>
                 <div class="text-end pt-2">
@@ -977,7 +1026,8 @@ class ProductPDFAnnotation extends Component {
                         annotation_id: rowId,
                         unique_button: buttonId,
                         delete_unique_button: deletebuttonId,
-                        reply: replyText
+                        reply: replyText,
+                        user_id: session.uid,
                     }]);
                 }
 

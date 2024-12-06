@@ -117,22 +117,64 @@ class HrEmployee(models.Model):
 
         # Call the super method to actually unlink the employees after archiving related records
         return super(HrEmployee, self).unlink()
-
+    
+    partner_id = fields.Many2one('res.partner', string="Partner")
 
     @api.model_create_multi
     def create(self, vals_list):
-        # Suppress automatic "Employee created" chatter message
-        self = self.with_context(mail_create_nolog=True)
-
-        # Call the super create method to create the employees with all the default logic
         employees = super(HrEmployee, self).create(vals_list)
 
-        # Add your custom logic to log "Member created" instead
-        for employee in employees:
-            employee.message_post(body="Member created")
+        self = self.with_context(mail_create_nolog=True)
 
-        # Return the created employees
+        for employee in employees:
+            if not employee.partner_id:
+                if not employee.related_partner_id:
+                    partner = self.env['res.partner'].search([('email', '=', employee.work_email)], limit=1)
+                    if not partner:
+                        partner_vals = {
+                            'name': employee.name,
+                            'email': employee.work_email,
+                            'phone': employee.work_phone,
+                            'mobile': employee.mobile_phone,
+                        }
+                        partner = self.env['res.partner'].create(partner_vals)
+
+                    employee.partner_id = partner
+                    employee.related_partner_id = partner
+                else:
+                    employee.partner_id = employee.related_partner_id
+            else:
+                employee.partner_id.write({'employee_ids': [(4, employee.id)]})
+
         return employees
+
+    def write(self, vals):
+        # Avoid recursion if the update is already in progress
+        if self.env.context.get('skip_partner_update', False):
+            return super(HrEmployee, self).write(vals)
+
+        # Proceed with the write operation
+        res = super(HrEmployee, self).write(vals)
+
+        # Fields to synchronize with partner
+        fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_id']
+        related_fields = {
+            'name': 'name',
+            'phone': 'phone',
+            'mobile': 'mobile',
+            'email': 'email',
+            'job_id': 'job_description',
+        }
+
+        # Propagate changes to related partner
+        for employee in self:
+            if employee.partner_id:
+                partner_vals = {related_fields[field]: vals[field] for field in fields_to_sync if field in vals}
+                if partner_vals:
+                    # Set the context flag to avoid recursion during the partner update
+                    employee.partner_id.with_context(skip_employee_update=True).write(partner_vals)
+
+        return res
 
 
 class HrEmployeePublic(models.Model):
