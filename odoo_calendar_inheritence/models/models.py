@@ -24,6 +24,8 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from xml.sax.saxutils import escape
 from weasyprint import HTML
+import pdfkit
+
 
 _logger = logging.getLogger(__name__)
 
@@ -1147,7 +1149,7 @@ class OdooCalendarInheritence(models.Model):
         pdf_stream.seek(0)
         return pdf_stream.getvalue()
 
-    def add_media_placeholder(pdf_writer, media_files):
+    def add_media_placeholder(self, pdf_writer, media_files):
         """
         Add placeholders for media files in the merged PDF.
         """
@@ -1169,47 +1171,125 @@ class OdooCalendarInheritence(models.Model):
     def action_merge_documents(self):
         """
         Merge all supported attachments (PDFs, images, DOCX) from the product lines of the event into a single document.
+        Additionally, include a cover page generated from the article HTML structure with the company logo.
         """
         self.ensure_one()
 
+        # Step 1: Fetch the company logo as binary and convert to Base64
+        company = self.env.company  # Fetch the current company
+        if not company.logo:
+            _logger.error("No logo found for the current company.")
+            raise UserError(_("No logo found for the current company."))
+
+        try:
+            company_logo_base64 = base64.b64encode(company.logo).decode('utf-8')
+            _logger.info("Company logo successfully converted to Base64.")
+        except Exception as e:
+            _logger.error("Error converting company logo to Base64: %s", str(e))
+            raise UserError(_("Error processing company logo: %s") % str(e))
+
+        # Step 2: Generate cover PDF from article HTML
+        if not self.article_id or not self.article_id.body:
+            raise UserError(_("No associated article found to generate the cover page."))
+
+        html_content = self.article_id.body
+
+        # Ensure the HTML has absolute URLs for resources like images
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        html_content = html_content.replace('/web/image', f'{base_url}/web/image')
+
+        # Add local Bootstrap CSS link to the HTML content
+        bootstrap_url = f'{base_url}/odoo_calendar_inheritence/static/src/bootstrap-5.1.3/css/bootstrap.min.css'
+        bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
+
+        # Inject Bootstrap and company logo into the head of the HTML
+        html_content_with_logo = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            {bootstrap_css}
+        </head>
+        <body>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <img src="data:image/png;base64,{company_logo_base64}" alt="Company Logo" style="width: 150px; height: auto;">
+            </div>
+            {html_content}
+        </body>
+        </html>
+        """
+
+        # Debug: Save HTML content for inspection
+        with open('/tmp/test_cover_page.html', 'w') as f:
+            f.write(html_content_with_logo)
+            _logger.info("Cover page HTML saved to /tmp/test_cover_page.html")
+
+        # Try to generate the PDF from the article's HTML content
+        pdf_cover_stream = io.BytesIO()
+        try:
+            options = {
+                'enable-local-file-access': None,
+                'quiet': '',
+                'encoding': 'UTF-8',
+                'disable-smart-shrinking': None,
+            }
+            pdf_data = pdfkit.from_string(html_content_with_logo, False, options=options)
+            pdf_cover_stream.write(pdf_data)
+            _logger.info("Cover page PDF generated successfully.")
+        except Exception as e:
+            _logger.error("Failed to generate cover PDF: %s", str(e))
+            raise UserError(_("Failed to generate cover PDF: %s") % str(e))
+
+        pdf_cover_stream.seek(0)
+        pdf_writer = PdfWriter()
+
+        # Add the cover page PDF to the writer
+        cover_pdf_reader = PdfReader(pdf_cover_stream)
+        for page in cover_pdf_reader.pages:
+            pdf_writer.add_page(page)
+
+        # Step 3: Add other attachments to the writer
         attachments = self.mapped('product_line_ids.pdf_attachment')
         if not attachments:
             raise UserError(_("No attachments found to merge."))
 
-        pdf_writer = PdfWriter()
-
         for attachment in attachments:
-            if attachment.mimetype == 'application/pdf':
-                # Add PDF to writer
-                pdf_data = base64.b64decode(attachment.datas)
-                pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                for page in pdf_reader.pages:
-                    pdf_writer.add_page(page)
-            elif attachment.mimetype.startswith('image/'):
-                # Convert image to PDF and add
-                pdf_data = self.image_to_pdf(attachment.datas)
-                pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                for page in pdf_reader.pages:
-                    pdf_writer.add_page(page)
-            elif attachment.mimetype == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                # Convert DOCX to PDF and add
-                pdf_data = self.docx_to_pdf(attachment.datas)
-                pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                for page in pdf_reader.pages:
-                    pdf_writer.add_page(page)
-            else:
-                # Add placeholder for unsupported media files
-                self.add_media_placeholder(pdf_writer, [attachment])
+            try:
+                if attachment.mimetype == 'application/pdf':
+                    # Add PDF to writer
+                    pdf_data = base64.b64decode(attachment.datas)
+                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                    for page in pdf_reader.pages:
+                        pdf_writer.add_page(page)
+                elif attachment.mimetype.startswith('image/'):
+                    # Convert image to PDF and add
+                    pdf_data = self.image_to_pdf(attachment.datas)
+                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                    for page in pdf_reader.pages:
+                        pdf_writer.add_page(page)
+                elif attachment.mimetype == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                    # Convert DOCX to PDF and add
+                    pdf_data = self.docx_to_pdf(attachment.datas)
+                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
+                    for page in pdf_reader.pages:
+                        pdf_writer.add_page(page)
+                else:
+                    # Add placeholder for unsupported media files
+                    self.add_media_placeholder(pdf_writer, [attachment])
+            except Exception as e:
+                _logger.error("Error processing attachment %s: %s", attachment.name, str(e))
+                raise UserError(_("Error processing attachment %s: %s") % (attachment.name, str(e)))
 
         if not pdf_writer.pages:
             raise UserError(_("No valid documents found in attachments."))
 
-        # Write the merged PDF to a stream
+        # Step 4: Write the merged PDF to a stream
         merged_pdf_stream = io.BytesIO()
         pdf_writer.write(merged_pdf_stream)
         merged_pdf_stream.seek(0)
 
-        # Create a new attachment with the merged content
+        # Step 5: Create a new attachment with the merged content
         merged_attachment = self.env['ir.attachment'].create({
             'name': f'Merged Document - {self.name}.pdf',
             'type': 'binary',
@@ -1218,6 +1298,8 @@ class OdooCalendarInheritence(models.Model):
             'res_model': 'calendar.event',
             'res_id': self.id,
         })
+
+        _logger.info("Merged document successfully created: %s", merged_attachment.name)
 
         return {
             'type': 'ir.actions.act_url',
