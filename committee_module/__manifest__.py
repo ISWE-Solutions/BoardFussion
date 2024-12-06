@@ -43,7 +43,8 @@ Long description of module's purpose
         "views/config.xml",
         "views/survey.xml",
         # views/web_UserMenu_views.xml",
-        "views/product_document_views.xml"
+        "views/product_document_views.xml",
+        "views/hr_employee_delete_wizard_form_inherit.xml",
     ],
     'installable': True,
     'application': False,

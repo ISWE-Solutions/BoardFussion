@@ -4,20 +4,11 @@ from odoo.exceptions import ValidationError, UserError
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    name = fields.Char(string="Member Name", related='resource_id.name', store=True, readonly=False, tracking=True)
     committees_ids = fields.Many2many('hr.department', string="Committees")
     job_id = fields.Many2one('hr.job', string="Title")
     registration_number = fields.Char(string="Registration Number of the Member")
     next_appraisal_date = fields.Date(string="Next Evaluation Date")
-
-    employee_type = fields.Selection([
-        ('member', 'Member'),
-        ('employee', 'Employee'),
-        ('student', 'Student'),
-        ('trainee', 'Trainee'),
-        ('contractor', 'Contractor'),
-        ('freelance', 'Freelancer'),
-    ], string='Member Type', default='employee', required=True, groups="hr.group_hr_user",
-        help="The member type. Although the primary purpose may seem to categorize members, this field has also an impact in the Contract History. Only Member type is supposed to be under contract and will have a Contract History.")
 
     member_type = fields.Selection([
         ('board_member', 'Board Member'),
