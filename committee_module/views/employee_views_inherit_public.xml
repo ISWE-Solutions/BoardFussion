@@ -16,6 +16,9 @@
                 <xpath expr="//button[@name='action_send_appraisal_request']" position="attributes">
                     <attribute name="string">Request Evaluation</attribute>
                 </xpath>
+                <xpath expr="//field[@name='address_id']" position="attributes">
+                    <attribute name="domain">[]</attribute>
+                </xpath>
             </field>
         </record>
 

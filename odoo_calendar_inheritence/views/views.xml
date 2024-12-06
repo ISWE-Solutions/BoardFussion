@@ -95,8 +95,9 @@
                 </button>
                 <button class="oe_stat_button" type="object" invisible="not article_exists"
                         name="action_view_knowledge_article"
-                        icon="fa-external-link" string="View Board Pack" confirm="Do you want to proceed ?">
+                        icon="fa-external-link" string="View Cover Page" confirm="Do you want to proceed ?">
                 </button>
+
                 <button class="oe_stat_button" name="action_create_agenda_descriptions" type="object"
                         string="View minutes"
                         icon="fa-external-link" confirm="Do you want to proceed ?"
@@ -201,17 +202,22 @@
                         <!--                                class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"-->
                         <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
-                        <button name="create_article_calendar" type="object" string="Create Board Pack"
+                        <button name="create_article_calendar" type="object" string="Create Cover Page"
                                 class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
                                 confirm="Do you want to create board pack?"/>
 
+                        <button name="action_merge_documents" type="object" string="Board Pack"
+                                class="btn btn-primary m-1" icon="fa-plus"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
+                                />
 
-                        <button string="Update Board Pack" invisible="not article_exists"
+
+                        <button string="Update Cover Page" invisible="not article_exists"
                                 name="action_add_knowledge_article" type="object"
                                 class="btn btn-success m-1" icon="fa-plus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
-                                confirm="Do you want to update the board pack?"/>
+                                confirm="Do you want to update the Cover Page?"/>
                     </div>
                 </page>
                 <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">

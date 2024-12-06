@@ -37,7 +37,7 @@
                     <field name="task_checklist_ids">
                         <tree editable="bottom">
                             <field name="name"/>
-                            <field name="progress" string="Percentage Done"/>
+                            <field name="progress" string="Percentage Done" attrs="{'max': 100.0}"/>
                             <field name="progress" widget="progressbar"/>
                         </tree>
                     </field>
