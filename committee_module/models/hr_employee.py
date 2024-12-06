@@ -4,6 +4,7 @@ from odoo.exceptions import ValidationError, UserError
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    name = fields.Char(string="Member Name", related='resource_id.name', store=True, readonly=False, tracking=True)
     committees_ids = fields.Many2many('hr.department', string="Committees")
     job_id = fields.Many2one('hr.job', string="Title")
     registration_number = fields.Char(string="Registration Number of the Member")
@@ -158,11 +159,14 @@ class HrEmployee(models.Model):
         return employees
 
     def write(self, vals):
-        if self.env.context.get('skip_partner_update'):
+        # Avoid recursion if the update is already in progress
+        if self.env.context.get('skip_partner_update', False):
             return super(HrEmployee, self).write(vals)
 
+        # Proceed with the write operation
         res = super(HrEmployee, self).write(vals)
 
+        # Fields to synchronize with partner
         fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_id']
         related_fields = {
             'name': 'name',
@@ -172,10 +176,12 @@ class HrEmployee(models.Model):
             'job_id': 'job_description',
         }
 
+        # Propagate changes to related partner
         for employee in self:
             if employee.partner_id:
                 partner_vals = {related_fields[field]: vals[field] for field in fields_to_sync if field in vals}
                 if partner_vals:
+                    # Set the context flag to avoid recursion during the partner update
                     employee.partner_id.with_context(skip_employee_update=True).write(partner_vals)
 
         return res

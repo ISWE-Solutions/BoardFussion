@@ -7,28 +7,33 @@ class ResPartner(models.Model):
 
     employee_ids = fields.One2many('hr.employee', 'partner_id', string="Employees")
 
-    def write(self, vals):
-        if self.env.context.get('skip_employee_update'):
-            return super(ResPartner, self).write(vals)
+    # def write(self, vals):
+    #     # Avoid recursion if the update is already in progress
+    #     if self.env.context.get('skip_employee_update', False):
+    #         return super(ResPartner, self).write(vals)
 
-        res = super(ResPartner, self).write(vals)
+    #     # Proceed with the write operation
+    #     res = super(ResPartner, self).write(vals)
 
-        fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
-        related_fields = {
-            'name': 'name',
-            'phone': 'work_phone',
-            'mobile': 'mobile_phone',
-            'email': 'work_email',
-            'job_description': 'job_id',
-        }
+    #     # Fields to propagate to employees
+    #     fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
+    #     related_fields = {
+    #         'name': 'name',
+    #         'phone': 'work_phone',
+    #         'mobile': 'mobile_phone',
+    #         'email': 'work_email',
+    #         'job_description': 'job_id',
+    #     }
 
-        for partner in self:
-            for employee in partner.employee_ids:
-                employee_vals = {related_fields[field]: vals[field] for field in fields_to_sync if field in vals}
-                if employee_vals:
-                    employee.with_context(skip_partner_update=True).write(employee_vals)
+    #     # Propagate changes to related employees
+    #     for partner in self:
+    #         for employee in partner.employee_ids:
+    #             employee_vals = {related_fields[field]: vals[field] for field in fields_to_sync if field in vals}
+    #             if employee_vals:
+    #                 # Set the context flag to avoid recursion during the employee update
+    #                 employee.with_context(skip_partner_update=True).write(employee_vals)
 
-        return res
+    #     return res
 
     # def toggle_active(self):
     #     super().toggle_active()  # Call the parent method

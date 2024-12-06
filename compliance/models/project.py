@@ -80,6 +80,11 @@ class TaskChecklist(models.Model):
     def _compute_is_done(self):
         for checklist in self:
             checklist.is_done = checklist.progress == 100
+            
+    @api.onchange('progress')
+    def _progress_check(self):
+        if self.progress > 100:
+            raise ValidationError('Progress must not be more than 100.')
 
     @api.constrains('progress')
     def _check_progress(self):
