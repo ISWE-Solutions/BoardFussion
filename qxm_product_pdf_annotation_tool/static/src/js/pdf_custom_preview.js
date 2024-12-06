@@ -87,9 +87,9 @@ class PDFCustomPreview extends Component {
         await page.render(renderContext).promise;
         console.log('Page rendered');
 
-        this.initializeMarkers(pageNum, canvasWrapper, canvas);
-        this.initializeHighlightMarkers(pageNum, canvasWrapper, canvas);
-        this.initializeCanvas(pageNum, canvasWrapper, canvas);
+        // this.initializeMarkers(pageNum, canvasWrapper, canvas);
+        // this.initializeHighlightMarkers(pageNum, canvasWrapper, canvas);
+        // this.initializeCanvas(pageNum, canvasWrapper, canvas);
     }
 
     createPageDiv(pageNum) {

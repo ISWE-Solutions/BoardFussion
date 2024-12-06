@@ -25,19 +25,5 @@
                    eval="[Command.link(ref('odoo_calendar_inheritence.group_agenda_meeting_board_member'))]"
             />
         </record>
-
-        <!--        Custom Groups For Project Task Module-->
-<!--        <record id="group_action_point_member" model="res.groups">-->
-<!--            <field name="name">Board Member</field>-->
-<!--            <field name="category_id" ref="base.module_category_services_project"/>-->
-<!--        </record>-->
-
-<!--        <record id="group_action_point_secretary" model="res.groups">-->
-<!--            <field name="name">Board secretary</field>-->
-<!--            <field name="category_id" ref="base.module_category_services_project"/>-->
-<!--                        <field name="implied_ids"-->
-<!--                   eval="[Command.link(ref('odoo_calendar_inheritence.group_action_point_member'))]"-->
-<!--            />-->
-<!--        </record>-->
     </data>
 </odoo>
