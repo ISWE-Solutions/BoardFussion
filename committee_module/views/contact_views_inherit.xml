@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data>
+        <record id="view_contact_update_wizard_form" model="ir.ui.view">
+            <field name="name">contact.update.wizard.form</field>
+            <field name="model">contact.update.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Contact Update">
+                    <sheet>
+                        <div>
+                            <label for="prompt_text"/>
+                            <field name="prompt_text" readonly="1"/>
+                        </div>
+                    </sheet>
+                    <footer>
+                        <button string="Confirm" type="object" name="confirm_update" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_res_partner_form_inherit" model="ir.ui.view">
+            <field name="name">res.partner.form.inherit</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form" />
+            <field name="arch" type="xml">
+                <!-- Add the button to the beginning of the sheet -->
+                <xpath expr="//sheet" position="before">
+                    <!-- <header>
+                        <button name="action_update_employees" type="object" string="Update Member(s)" class="btn-primary" />
+                    </header> -->
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

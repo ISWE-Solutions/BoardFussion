@@ -2,38 +2,85 @@ from odoo import models, fields, api
 from odoo.exceptions import RedirectWarning
 from odoo.exceptions import ValidationError, UserError
 
+class ContactUpdateWizard(models.TransientModel):
+    _name = 'contact.update.wizard'
+    _description = 'Contact Update Wizard'
+
+    prompt_text = fields.Text(string="Prompt Text", readonly=True)
+    partner_id = fields.Many2one('res.partner', string="Related Partner", readonly=True)
+
+    def confirm_update(self):
+        # Trigger the employee update when the user confirms the update
+        self.partner_id._update_employee()
+
+        # Close the wizard after confirmation
+        return {'type': 'ir.actions.act_window_close'}
+
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
     employee_ids = fields.One2many('hr.employee', 'partner_id', string="Employees")
 
-    # def write(self, vals):
-    #     # Avoid recursion if the update is already in progress
-    #     if self.env.context.get('skip_employee_update', False):
-    #         return super(ResPartner, self).write(vals)
+    def write(self, vals):
+        # Proceed with the write operation
+        res = super(ResPartner, self).write(vals)
 
-    #     # Proceed with the write operation
-    #     res = super(ResPartner, self).write(vals)
+        # Trigger the popup only after the save
+        self._trigger_update_popup()
+        return res
 
-    #     # Fields to propagate to employees
-    #     fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
-    #     related_fields = {
-    #         'name': 'name',
-    #         'phone': 'work_phone',
-    #         'mobile': 'mobile_phone',
-    #         'email': 'work_email',
-    #         'job_description': 'job_id',
-    #     }
+    def _trigger_update_popup(self):
+        # Trigger the wizard (popup) after contact update
+        return {
+            'name': 'contact.update.wizard',
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'contact.update.wizard',
+            'target': 'new',  # Open in a new window (popup)
+            'context': {
+                'default_prompt_text': f"The contact '{self.name}' has been updated successfully.",
+                'default_partner_id': self.id,  # Pass the current partner_id to the wizard
+            },
+        }
 
-    #     # Propagate changes to related employees
-    #     for partner in self:
-    #         for employee in partner.employee_ids:
-    #             employee_vals = {related_fields[field]: vals[field] for field in fields_to_sync if field in vals}
-    #             if employee_vals:
-    #                 # Set the context flag to avoid recursion during the employee update
-    #                 employee.with_context(skip_partner_update=True).write(employee_vals)
+    def action_update_employees(self):
+        self._update_employee()
 
-    #     return res
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': "Employee Updates",
+                'message': f"Members linked to {len(self)} partner(s) were successfully updated.",
+                'type': 'success',  # types: success, warning, danger, info
+                'sticky': False,
+            },
+        }
+
+    def _update_employee(self):
+        # Fields to propagate to employees
+        fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
+        related_fields = {
+            'name': 'name',
+            'phone': 'work_phone',
+            'mobile': 'mobile_phone',
+            'email': 'work_email',
+            'job_description': 'job_id',
+        }
+
+        # Propagate changes to related employees
+        for partner in self:
+            for employee in partner.employee_ids:
+                # Build a dictionary of fields to update
+                employee_vals = {
+                    related_fields[field]: getattr(partner, field, None)
+                    for field in fields_to_sync
+                    if getattr(partner, field, None)  # Ensure the field exists and has a value
+                }
+
+                if employee_vals:
+                    # Prevent recursion during the employee update
+                    employee.with_context(skip_partner_update=True).write(employee_vals)
 
     # def toggle_active(self):
     #     super().toggle_active()  # Call the parent method

@@ -26,6 +26,7 @@ Long description of module's purpose
         "data/tag_data.xml",
         # data/hr_appraisal_templates_inherit.xml",
         # "views/title.xml",
+        "views/contact_views_inherit.xml",
         "views/member_view.xml",
         "views/views.xml",
         "views/email.xml",
