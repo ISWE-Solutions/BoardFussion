@@ -1,8 +1,12 @@
+from email.policy import default
+
 from markupsafe import Markup
 from odoo import models, fields, _, api
 from odoo.exceptions import ValidationError, AccessError
 import base64
 import logging
+from bs4 import BeautifulSoup
+from odoo.tools import html2plaintext
 
 _logger = logging.getLogger()  
 
@@ -29,13 +33,37 @@ class CalendarEventProductLine(models.Model):
     Restricted = fields.Many2many(
         'res.partner',
         'calendar_event_product_line_res_partner_rel',  # Unique relation table name
-        string="Document Restricted Visibility",
+        string="Document visible to:",
         compute="_compute_restricted_attendees",
         store=True,
         readonly =False,
     )
 
     is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
+    confidential = fields.Boolean(string="Confidential", default=False)
+
+    user_is_board_member_or_secretary = fields.Boolean(compute='_compute_user_is_board_member_or_secretary',
+                                                       store=False)
+    display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
+
+    @api.depends('confidential')
+    def _compute_user_is_board_member_or_secretary(self):
+        user = self.env.user
+        group_ids = user.groups_id.ids
+        board_member_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_member').id
+        secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary').id
+        self.user_is_board_member_or_secretary = (board_member_group in group_ids or secretary_group in group_ids)
+
+
+    @api.depends('confidential', 'user_is_board_member_or_secretary', 'description')
+    def _compute_display_description(self):
+        for record in self:
+            if record.confidential and not record.user_is_board_member_or_secretary:
+                record.display_description = 'Confidential'
+            else:
+                record.display_description = html2plaintext(record.description or "")
+            _logger.info("Computed display_description: %s", record.display_description)
+
 
     @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id')  # Include creator in dependencies
     def _compute_restricted_attendees(self):

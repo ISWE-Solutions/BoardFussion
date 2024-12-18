@@ -56,7 +56,6 @@
             </field>
         </record>
 
-
         <record id="view_calendar_event_form_inherit" model="ir.ui.view">
             <field name="name">calendar.event.form.inherit</field>
             <field name="model">calendar.event</field>
@@ -67,11 +66,8 @@
                     <span>Board Fusion meeting</span>
                 </xpath>
                 <xpath expr="//field[@name='partner_ids']" position="attributes">
-                    <attribute name="domain">[('employee_ids', '!=', False)]</attribute>
+                    <attribute name="domain">[('employee', '!=', True), ('active', '=', True)]</attribute>
                 </xpath>
-<!--                <xpath expr="//field[@name='description']" position="after">-->
-<!--                    <field name="Restricted" widget="many2many_tags"/>-->
-<!--                </xpath>-->
             </field>
         </record>
 
@@ -137,6 +133,7 @@
         <!--                </p>-->
         <!--            </field>-->
         <!--        </record>-->
+
 
     </data>
 </odoo>

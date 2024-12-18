@@ -91,11 +91,12 @@
                 <!--                <field name="is_user_restricted" invisible="1"/>-->
                 <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
                         icon="fa-file-text-o">
-                    <field name="document_count" widget="statinfo" string="Document"/>
+                    <field name="document_count" widget="statinfo" string="All Document"/>
                 </button>
+
                 <button class="oe_stat_button" type="object" invisible="not article_exists"
-                        name="action_view_knowledge_article"
-                        icon="fa-external-link" string="View Cover Page" confirm="Do you want to proceed ?">
+                        name="action_open_boardpack"
+                        icon="fa-external-link" string="View Board Pack" confirm="Do you want to proceed ?">
                 </button>
 
                 <button class="oe_stat_button" name="action_create_agenda_descriptions" type="object"
@@ -184,40 +185,53 @@
                             <control>
                                 <create string="Add Agenda"/>
                             </control>
-                            <!--                            <field name="product_id"/>-->
                             <field name="sequence" widget="handle"/>
-                            <field name="agenda" column_invisible='True'/>
-                            <field name="description" string="Agenda Item"/>
+                            <field name="agenda" column_invisible="True"/>
+                            <field name="display_description" string="Agenda Item"/>
                             <field name="presenter_id" widget="many2many_tags"/>
                             <field name="is_user_restricted" column_invisible="1"/>
-                            <!--                            <field name="Restricted" widget="many2many_tags" column_invisible="0" />-->
-                            <!--                            <field name="document_names" string="Document Names"/>-->
+                            <field name="confidential" column_invisible="0" widget="boolean_toggle"
+                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
                             <button name="action_open_documents" string="Attachments" type="object"
                                     icon="fa-file-text-o" invisible="is_user_restricted, '=', False"/>
                         </tree>
                     </field>
+
                     <div>
                         <field name="article_exists" invisible="1"/>
                         <!--                        <button string="Create Board Pack" name="action_create_html_all" type="object"-->
                         <!--                                class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"-->
                         <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
-                        <button name="create_article_calendar" type="object" string="Create Cover Page"
+                        <button name="create_article_calendar" type="object" string="Build Agenda"
                                 class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
                                 confirm="Do you want to create board pack?"/>
 
                         <button name="action_merge_documents" type="object" string="Board Pack"
+                                invisible="not article_exists"
                                 class="btn btn-primary m-1" icon="fa-plus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
-                                />
+                        />
 
+                        <button string="View Agenda" invisible="not article_exists"
+                                name="action_view_knowledge_article" type="object"
+                                class="btn btn-info m-1" icon="fa-external-link"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                        <button string="Update Cover Page" invisible="not article_exists"
-                                name="action_add_knowledge_article" type="object"
+                        <button string="Update Agenda" invisible="not article_exists"
+                                name="cover_page_update" type="object"
                                 class="btn btn-success m-1" icon="fa-plus"
+                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+
+                        <button string="Reset Agenda" invisible="not article_exists"
+                                name="delete_article" type="object"
+                                class="btn btn-danger m-1" icon="fa-minus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
-                                confirm="Do you want to update the Cover Page?"/>
+                        />
+
                     </div>
                 </page>
                 <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
@@ -242,6 +256,10 @@
                             <field name="attendee_name" readonly="1" force_save="1"/>
                             <field name="email" widget="email"/>
                             <field name="phone" widget="phone"/>
+                            <field name="position" widget="position"/>
+                            <!--                            <field name="is_board_member" string="Member Role"/>-->
+                            <!--                            <field name="is_board_secretary" string="Secretary Role"/>-->
+
                             <field name="has_attended" string="Attendend?" force_save="1"/>
                         </tree>
                     </field>

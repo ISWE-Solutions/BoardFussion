@@ -39,6 +39,9 @@
                 <field name="attendee_name" string="Name"/>
                 <field name="email" string="Email"/>
                 <field name="phone" string="Phone"/>
+                <field name="position" string="Position"/>
+                <field name="is_board_member" string="Member Role"/>
+                <field name="is_board_secretary" string="Secretary Role"/>
                 <field name="has_attended"/>
                 <field name="calendar_id"/>
             </tree>

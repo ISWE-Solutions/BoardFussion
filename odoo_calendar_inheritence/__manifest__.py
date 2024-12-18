@@ -30,7 +30,9 @@ Long description of module's purpose
                 'qxm_product_pdf_annotation_tool',
                 'knowledge',
                 'website_sale',
-                "appointment"
+                "appointment",
+                "web",
+                # "pdfjs-dist"
                 ],
 
     # always loaded
@@ -61,7 +63,10 @@ Long description of module's purpose
     ],
     'assets': {
         'web.assets_backend': [
+            ('include', 'web.pdf_js_lib'),
             'odoo_calendar_inheritence/static/src/js/custom_confirm.js',
+            # 'odoo_calendar_inheritence/static/src/js/custom_pdf_viewer.js',
+            # 'odoo_calendar_inheritence/static/src/xml/merge_preview.xml',
             'odoo_calendar_inheritence/static/src/js/calendar_event_restriction.js',
             'odoo_calendar_inheritence/static/src/js/action_board_knowledge',
             'odoo_calendar_inheritence/static/src/css/agenda_lines.css',

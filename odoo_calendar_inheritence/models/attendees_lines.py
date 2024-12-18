@@ -8,3 +8,7 @@ class AttendeesLines(models.Model):
     phone = fields.Char(string='Phone')
     has_attended = fields.Boolean(default=True)
     calendar_id = fields.Many2one('calendar.event', string='Calendar')
+    partner_id = fields.Many2one('res.partner', string="Partner")
+    position = fields.Char(string="Position")
+    is_board_member = fields.Boolean(string="Board Member")
+    is_board_secretary = fields.Boolean(string="Board Secretary")

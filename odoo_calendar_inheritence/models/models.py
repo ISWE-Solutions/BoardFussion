@@ -1,31 +1,25 @@
 from PyPDF2 import PdfReader, PdfWriter
+import re
 from markupsafe import Markup
 from bs4 import BeautifulSoup
 import base64
-from datetime import time
 import logging
 import io
 import re
 from io import BytesIO
-import babel
-import babel.dates
 from markupsafe import Markup, escape
-from PIL import Image
-from lxml import etree, html
+from PIL import Image, ImageFilter, ImageDraw, ImageFont
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
 from docx import Document
 from reportlab.lib.utils import ImageReader
-from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowable, ListItem
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from reportlab.lib import colors
 from xml.sax.saxutils import escape
 from weasyprint import HTML
 import pdfkit
-
 
 _logger = logging.getLogger(__name__)
 
@@ -93,6 +87,7 @@ class OdooCalendarInheritence(models.Model):
     product_document_ids = fields.Many2many(comodel_name='product.document', compute='_compute_product_documents',
                                             string='Product Documents')
     article_exists = fields.Boolean(compute='_compute_article_exists', store=False)
+    # bp_exists = fields.Boolean(compute='_compute_article_exists', store=False)
     article_id = fields.Many2one('knowledge.article', string='Related Article')
     description_article_id = fields.Many2one('knowledge.article', string='Related Description Article')
     task_created = fields.Boolean(string="Task Created", default=False)
@@ -151,6 +146,17 @@ class OdooCalendarInheritence(models.Model):
          ('confidential', 'Only internal users')],
         'Privacy', default='private', required=True,
         help="People to whom this event will be visible.")
+
+    employee_partner_ids = fields.Many2many(
+        'res.partner',
+        compute='_compute_employee_partner_ids',
+        store=False,
+        string="Employee Partners"
+    )
+
+    def _compute_employee_partner_ids(self):
+        employees = self.env['hr.employee'].search([])
+        self.employee_partner_ids = employees.mapped('address_home_id')
 
     @api.depends('product_line_ids')
     def _compute_agenda_count(self):
@@ -241,6 +247,9 @@ class OdooCalendarInheritence(models.Model):
         res = super(OdooCalendarInheritence, self).write(vals)
         return res
 
+    def update_article_calendar(self):
+        return ""
+
     @api.depends('article_id')
     def _compute_article_exists(self):
         for record in self:
@@ -258,6 +267,83 @@ class OdooCalendarInheritence(models.Model):
 
         return "data:%s;base64,%s" % (Image.MIME[image.format], value.decode('ascii'))
 
+    def delete_article(self):
+        """ Deletes the linked article if it exists. """
+        if not self.article_id:
+            raise ValidationError("No associated article found to delete!")
+
+        # Log the article name for debugging
+        _logger.info("Deleting Article: %s", self.article_id.name)
+
+        try:
+            # Unlink (delete) the article
+            self.article_id.unlink()
+
+            # Clear the reference on the agenda record
+            self.article_id = False
+            self.last_write_count = 0
+            self.last_write_date = fields.Datetime.now()
+
+            _logger.info("Article successfully deleted.")
+        except Exception as e:
+            _logger.error("Error deleting article: %s", str(e))
+            raise ValidationError("An error occurred while deleting the article.")
+
+    def remove_attendees_from_article(self):
+        """
+        Removes Board Members and Regular Attendees sections from the article.
+        Provides success or failure notifications.
+        """
+        try:
+            # Ensure an article exists
+            if not self.article_id:
+                raise UserError("No article found! Please create an article first.")
+
+            # Parse the existing article body using BeautifulSoup
+            existing_body = self.article_id.body
+            soup = BeautifulSoup(existing_body, 'html.parser')
+
+            # Find and remove sections with TO and CC headers
+            to_section = soup.find('h3', string="TO:")
+            cc_section = soup.find('h3', string="CC:")
+
+            if to_section:
+                # Remove the TO section (including its parent div and <hr>)
+                to_div = to_section.find_parent('div')
+                if to_div:
+                    to_div.decompose()
+
+            if cc_section:
+                # Remove the CC section (including its parent div and <hr>)
+                cc_div = cc_section.find_parent('div')
+                if cc_div:
+                    cc_div.decompose()
+
+            # Update the article with the modified body
+            new_body_content = str(soup)
+            self.article_id.sudo().write({'body': Markup(new_body_content)})
+
+            # Update timestamps
+            self.last_write_date = fields.Datetime.now()
+            self.last_write_count = 0  # Reset attendee count
+
+            # Return a success notification
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Success',
+                    'message': 'All attendees have been successfully removed from the article!',
+                    'type': 'success',  # 'success', 'warning', 'danger'
+                    'sticky': False,  # Notification disappears after a few seconds
+                }
+            }
+
+        except UserError as e:
+            raise UserError(f"Error: {e}")
+
+        except Exception as e:
+            raise UserError(f"An unexpected error occurred: {e}")
 
     def create_article_calendar(self):
         if not self.product_line_ids:
@@ -267,21 +353,22 @@ class OdooCalendarInheritence(models.Model):
         company_id = self.env.company
         product_id = self.product_id.id
         logo = company_id.logo
-        if logo:
-            logo_html = Markup('<img src="%s" class="bg-view" alt="Company Logo"/>') % self._get_src_data_b64(logo)
-        else:
-            logo_html = ''
+        logo_html = (
+            Markup('<img src="%s" class="bg-view" alt="Company Logo"/>') % self._get_src_data_b64(logo)
+            if logo else ''
+        )
 
+        # Build agenda table
         html_content = Markup("""
-                    <table class="table">
-                        <thead>
-                            <tr style="border: 0px; background-color: #ffffff;">
-                                <th style="padding: 10px; border: 0px;">ID</th>
-                                <th style="padding: 10px; border: 0px;">Agenda Item</th>
-                                <th style="padding: 10px; border: 0px;">Presenter</th>
-                            </tr>
-                        </thead>
-                        <tbody id="article_body">
+            <table class="table">
+                <thead>
+                    <tr style="border: 0px; background-color: #ffffff;">
+                        <th style="padding: 10px; border: 0px;">ID</th>
+                        <th style="padding: 10px; border: 0px;">Agenda Item</th>
+                        <th style="padding: 10px; border: 0px;">Presenter</th>
+                    </tr>
+                </thead>
+                <tbody id="article_body">
         """)
 
         for line in self.product_line_ids:
@@ -297,60 +384,86 @@ class OdooCalendarInheritence(models.Model):
                 description=line.description or 'N/A',
                 presenters=presenters or 'N/A'
             )
-
             counter += 1
 
-        html_content += Markup("""
-                        </tbody>
-                    </table>
-                    """)
+        html_content += Markup("</tbody></table>")
 
+        # Filter attendees by role
+        board_attendees = []
+        regular_attendees = []
+
+        for attendee in self.attendees_lines_ids:  # Assuming self.attendees_ids has attendee lines
+            if attendee.is_board_member or attendee.is_board_secretary:
+                board_attendees.append(attendee)
+            else:
+                regular_attendees.append(attendee)
+
+        # Generate Board Members Section
+        board_attendees_content = Markup("")
+        if board_attendees:
+            board_attendees_content += Markup("<div><h3>Board Members</h3>")
+            for attendee in board_attendees:
+                position = f" ({attendee.position})" if attendee.position else ""
+                board_attendees_content += Markup("<p>{attendee_name}   {position}</p>").format(
+                    attendee_name=attendee.attendee_name, position=position
+                )
+            board_attendees_content += Markup("</div><hr/>")
+
+        # Generate Regular Attendees Section
+        regular_attendees_content = Markup("")
+        if regular_attendees:
+            regular_attendees_content += Markup("<div><h3>Other Attendees</h3>")
+            for attendee in regular_attendees:
+                position = f" ({attendee.position})" if attendee.position else ""
+                regular_attendees_content += Markup("<p>{attendee_name}   {position}</p>").format(
+                    attendee_name=attendee.attendee_name, position=position
+                )
+            regular_attendees_content += Markup("</div><hr/>")
+
+        # Add description section
+        description_content = Markup("")
+        if self.description:
+            description_content += Markup("""
+                <div>
+                    <h3>Description</h3>
+                    <p>{description}</p>
+                    <hr/>
+                </div>
+            """).format(description=self.description)
+
+        # Build article body
         body_content = Markup("""
             <div>
                 <header style="text-align: center;">
                     {logo_html}<br><br>
-                    <h2><strong>{company_name}<strong></h2>
+                    <h2><strong>{company_name}</strong></h2>
                 </header>
                 <div class="container">
                     <div class="card-body border-dark">
                         <div class="row no-gutters align-items-center">
                             <div class="col align-items-center">
-                                <p class="mb-0">
-                                    <span> {company_street} </span>
-                                </p>
-                                <p class="mb-0">
-                                   <span> {company_city} </span>
-                                </p>
-                                <p class="m-0">
-                                   <span> {company_country} </span>
-                                </p>
+                                <p class="mb-0"><span>{company_street}</span></p>
+                                <p class="mb-0"><span>{company_city}</span></p>
+                                <p class="m-0"><span>{company_country}</span></p>
                             </div>
                             <div class="col-auto">
                                 <div class="float-right text-end">
-                                    <p class="mb-0 float-right">
-                                        <span> {company_phone} </span>
-                                        <i class="fa fa-phone-square ms-2 text-info" title="Phone"/>
-                                    </p>
-                                    <p class="mb-0 float-right">
-                                       <span> {company_email} </span>
-                                        <i class="fa fa-envelope ms-2 text-info" title="Email"/>
-                                    </p>
-                                    <p class="mb-0 float-right">
-                                        <span> {company_website} </span>
-                                        <i class="fa fa-globe ms-2 text-info" title="Website"/>
-                                    </p>
+                                    <p class="mb-0 float-right"><span>{company_phone}</span></p>
+                                    <p class="mb-0 float-right"><span>{company_email}</span></p>
+                                    <p class="mb-0 float-right"><span>{company_website}</span></p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div><br><hr>
                 <div class="container">
-                <p><strong style='font-size: 14px;'>Title: </strong> {event_name}</p>
-                <p><strong>Start Date:</strong> {start_date}</p>
-                <p><strong>Organizer:</strong> {organizer}</p>
-                <p><strong>Subject:</strong> {description}</p>
+                    <p><strong>Title: </strong> {event_name}</p>
+                    <p><strong>Start Date:</strong> {start_date}</p>
+                    <p><strong>Organizer:</strong> {organizer}</p>
                 </div>
                 <hr/>
+                {description_content}
+                <h3>Agenda</h3>
                 {html_content}
             </div>
         """).format(
@@ -365,10 +478,13 @@ class OdooCalendarInheritence(models.Model):
             event_name=self.name,
             start_date=self.start_date if self.start_date else ' ',
             organizer=self.user_id.name,
-            description=self.description,
+            description_content=description_content,
+            board_attendees_content=board_attendees_content,
+            regular_attendees_content=regular_attendees_content,
             html_content=html_content
         )
 
+        # Create or update the article
         article_values = {
             'name': Markup("Agenda: {event_name}").format(event_name=self.name),
             'body': body_content,
@@ -377,42 +493,336 @@ class OdooCalendarInheritence(models.Model):
 
         article = self.env['knowledge.article'].sudo().create(article_values)
         self.article_id = article.id
-
         self.article_id.product_id = self.product_id.id
         self.last_write_count = len(self.product_line_ids)
         self.last_write_date = fields.Datetime.now()
+
+    def update_attendees_in_article(self):
+        """
+        Add Board Members and Regular Attendees sections above the Agenda header in an existing article.
+        Provides success or failure notifications.
+        """
+        try:
+            # Ensure an article is already created
+            if not self.article_id:
+                raise ValidationError("No article found! Please create an article first.")
+
+            # Fetch attendees: Board members and regular attendees
+            board_attendees = []
+            regular_attendees = []
+
+            for attendee in self.attendees_lines_ids:
+                if attendee.is_board_member or attendee.is_board_secretary:
+                    board_attendees.append(attendee)
+                else:
+                    regular_attendees.append(attendee)
+
+            # Generate Board Members Section
+            board_attendees_content = ""
+            if board_attendees:
+                board_attendees_content += "<div><h3>TO:</h3>"
+                for attendee in board_attendees:
+                    position = f" ({attendee.position})" if attendee.position else ""
+                    board_attendees_content += f"<p>{attendee.attendee_name} {position}</p>"
+                board_attendees_content += "</div><hr/>"
+
+            # Generate Regular Attendees Section
+            regular_attendees_content = ""
+            if regular_attendees:
+                regular_attendees_content += "<div><h3>CC:</h3>"
+                for attendee in regular_attendees:
+                    position = f" ({attendee.position})" if attendee.position else ""
+                    regular_attendees_content += f"<p>{attendee.attendee_name} {position}</p>"
+                regular_attendees_content += "</div><hr/>"
+
+            # Combine both sections
+            attendees_content = board_attendees_content + regular_attendees_content
+
+            # Parse the existing article body using BeautifulSoup
+            existing_body = self.article_id.body
+            soup = BeautifulSoup(existing_body, 'html.parser')
+
+            # Find the Agenda header
+            agenda_header = soup.find('h3', string="Agenda")
+            if agenda_header:
+                # Insert attendees' content before the Agenda header
+                attendees_soup = BeautifulSoup(attendees_content, 'html.parser')
+                agenda_header.insert_before(attendees_soup)
+            else:
+                # Fallback: Append attendees' content at the end
+                attendees_soup = BeautifulSoup(attendees_content, 'html.parser')
+                soup.append(attendees_soup)
+
+            # Update the article with the modified body
+            new_body_content = str(soup)
+            self.article_id.sudo().write({'body': Markup(new_body_content)})
+
+            # Update timestamps
+            self.last_write_date = fields.Datetime.now()
+            self.last_write_count = len(self.attendees_lines_ids)
+
+            # Return a success notification
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Success',
+                    'message': 'Attendees successfully updated in the article!',
+                    'type': 'success',  # 'success', 'warning', 'danger'
+                    'sticky': False,  # Notification disappears after a few seconds
+                }
+            }
+
+        except ValidationError as e:
+            raise UserError(f"Error: {e}")
+
+        except Exception as e:
+            raise UserError(f"An unexpected error occurred: {e}")
+
+    def update_agenda_lines(self):
+        """
+        Updates the agenda lines in the article body.
+        Provides success or failure notifications.
+        """
+        try:
+            # Check for product line ids
+            if not self.product_line_ids:
+                raise ValidationError("Please add an agenda before making an Article!")
+
+            # Construct the HTML table
+            html_content = Markup("""
+                <table class="table">
+                    <thead>
+                        <tr style="border: 0px; background-color: #ffffff;">
+                            <th style="padding: 10px; border: 0px;">ID</th>
+                            <th style="padding: 10px; border: 0px;">Agenda Item</th>
+                            <th style="padding: 10px; border: 0px;">Presenter</th>
+                        </tr>
+                    </thead>
+                    <tbody id="article_body">
+            """)
+
+            counter = 1
+            for line in self.product_line_ids:
+                presenters = ', '.join(presenter.name for presenter in line.presenter_id)
+                html_content += Markup("""
+                    <tr style="border: 0px;">
+                        <td style="padding: 10px; border: 0px;">{counter}</td>
+                        <td style="padding: 10px; border: 0px;">{description}</td>
+                        <td style="padding: 10px; border: 0px;">{presenters}</td>
+                    </tr>
+                """).format(
+                    counter=counter,
+                    description=line.description or 'N/A',
+                    presenters=presenters or 'N/A'
+                )
+                counter += 1
+
+            html_content += Markup("</tbody></table>")
+
+            # Get the existing article
+            article = self.env['knowledge.article'].sudo().browse(self.article_id.id)
+
+            # Update the article body
+            body_content = article.body
+            start_index = body_content.find('<h3>Agenda</h3>')
+            end_index = body_content.find('</table>', start_index)
+
+            if start_index == -1 or end_index == -1:
+                raise ValidationError("Failed to update article: Agenda section not found.")
+
+            body_content = body_content[:start_index + len('<h3>Agenda</h3>')] + html_content + body_content[
+                                                                                                end_index + len(
+                                                                                                    '</table>'):]
+
+            # Update article body
+            article.body = body_content
+            self.last_write_count = len(self.product_line_ids)
+            self.last_write_date = fields.Datetime.now()
+
+            # Return a success notification
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Success',
+                    'message': 'Agenda successfully updated in the article!',
+                    'type': 'success',  # can be 'success', 'warning', or 'danger'
+                    'sticky': False,  # Notification disappears after a few seconds
+                }
+            }
+
+        except ValidationError as e:
+            raise UserError(f"Error: {e}")
+
+        except Exception as e:
+            raise UserError(f"An unexpected error occurred: {e}")
+
+    def cover_page_update(self):
+        """
+        Updates the cover page by:
+        1. Removing existing attendees.
+        2. Adding updated attendees.
+        3. Updating agenda lines.
+        Provides success or failure notifications.
+        """
+        try:
+            # Step 1: Remove existing attendees
+            self.remove_attendees_from_article()
+
+            # Step 2: Add updated attendees
+            self.update_attendees_in_article()
+
+            # Step 3: Update agenda lines
+            self.update_agenda_lines()
+
+            # Update timestamps
+            self.last_write_date = fields.Datetime.now()
+
+            # Success notification
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Success',
+                    'message': 'Cover page has been successfully updated!',
+                    'type': 'success',  # Notification type
+                    'sticky': False,  # Auto-dismiss notification
+                }
+            }
+
+        except UserError as e:
+            # Handle any known validation or user errors
+            raise UserError(f"Error: {e}")
+
+        except Exception as e:
+            # Handle unexpected errors
+            raise UserError(f"An unexpected error occurred: {e}")
 
     def action_add_knowledge_article(self):
         if not self.article_id:
             raise ValidationError("No Article for these records in Knowledge Module!")
 
-        filtered_product_lines_2 = [line for line in self.product_line_ids if line.create_date >= self.last_write_date]
+        # Log initial conditions
+        _logger.info("Starting action_add_knowledge_article")
+        _logger.info(f"Article ID: {self.article_id.id}")
+        _logger.info(f"Last write date: {self.last_write_date}")
+        _logger.info(f"Product lines count: {len(self.product_line_ids)}")
+        _logger.info(f"Attendees count: {len(self.attendees_lines_ids)}")
 
-        if not filtered_product_lines_2:
-            raise UserError(_("No new data added to the agenda! Please add data before making changes to the article!"))
+        # Ensure there's new data
+        new_product_lines = [line for line in self.product_line_ids if line.create_date >= self.last_write_date]
+        if not new_product_lines and not self.attendees_lines_ids:
+            raise UserError(
+                _("No new data added to the agenda or attendees! Please add data before making changes to the article!"))
 
+        # Parse existing article content
         existing_content = self.article_id.body
         soup = BeautifulSoup(existing_content, 'html.parser')
 
-        # Find the existing table body
-        table_body = soup.find('tbody')
-        if not table_body:
-            raise UserError(_("No existing table found in the article!"))
+        # Helper to find or raise for required headers
+        def get_header(title):
+            header = soup.find('h3', string=title)
+            if not header:
+                raise UserError(_(f"No '{title}' header found in the article!"))
+            return header
 
-        filtered_product_lines = [line for line in self.product_line_ids if line.create_date < self.last_write_date]
-        serial = len(filtered_product_lines) + 1
+        agenda_header = get_header("Agenda")
 
-        for line in self.product_line_ids:
-            if line.create_date >= self.last_write_date:
+        # Extract current attendees from the article
+        def extract_attendees_from_section(title):
+            section_header = soup.find('h3', string=title)
+            if not section_header:
+                return []
+            attendees = []
+            for p in section_header.find_next_siblings('p'):
+                if p.name == 'p':
+                    attendees.append(p.get_text())
+                else:
+                    break
+            return attendees
+
+        existing_to_attendees = extract_attendees_from_section("TO:")
+        existing_cc_attendees = extract_attendees_from_section("CC:")
+
+        # Log extracted attendees
+        _logger.info(f"Existing TO attendees: {existing_to_attendees}")
+        _logger.info(f"Existing CC attendees: {existing_cc_attendees}")
+
+        # Separate attendees into TO and CC
+        to_attendees = [attendee for attendee in self.attendees_lines_ids if
+                        attendee.is_board_member or attendee.is_board_secretary]
+        cc_attendees = [attendee for attendee in self.attendees_lines_ids if
+                        not attendee.is_board_member and not attendee.is_board_secretary]
+
+        # Format new attendees for comparison
+        def format_attendee(attendee):
+            position = f" ({attendee.position})" if attendee.position else " (Unknown Position)"
+            return f"{attendee.attendee_name}{position}"
+
+        new_to_attendees = [format_attendee(attendee) for attendee in to_attendees]
+        new_cc_attendees = [format_attendee(attendee) for attendee in cc_attendees]
+
+        # Log new attendees
+        _logger.info(f"New TO attendees: {new_to_attendees}")
+        _logger.info(f"New CC attendees: {new_cc_attendees}")
+
+        # Convert existing attendees to set for comparison (avoids duplicates)
+        existing_to_set = set(existing_to_attendees)
+        existing_cc_set = set(existing_cc_attendees)
+
+        # Check if there are new attendees to add
+        new_to_attendees_unique = [attendee for attendee in new_to_attendees if attendee not in existing_to_set]
+        new_cc_attendees_unique = [attendee for attendee in new_cc_attendees if attendee not in existing_cc_set]
+
+        # Log attendee comparison result
+        _logger.info(f"New TO attendees (unique): {new_to_attendees_unique}")
+        _logger.info(f"New CC attendees (unique): {new_cc_attendees_unique}")
+
+        # Update attendees only if there are changes
+        if new_to_attendees_unique or new_cc_attendees_unique:
+            # Remove existing TO and CC sections
+            _logger.info("Updating TO and CC sections.")
+            for header in soup.find_all('h3', string=["TO:", "CC:"]):
+                section = header.find_next_sibling('div')
+                if section:
+                    section.decompose()
+                header.decompose()
+
+            # Generate the TO and CC sections, adding only non-duplicate attendees
+            def generate_attendee_section(title, attendees):
+                section_html = f"<h3>{title}</h3>"
+                if attendees:
+                    for attendee in attendees:
+                        section_html += f"<p>{attendee}</p>"
+                else:
+                    section_html += "<p>No attendees listed.</p>"
+                return section_html
+
+            to_section = generate_attendee_section("TO:", new_to_attendees_unique)
+            cc_section = generate_attendee_section("CC:", new_cc_attendees_unique)
+
+            # Insert the new TO and CC sections before the Agenda
+            agenda_header.insert_before(BeautifulSoup(to_section, 'html.parser'))
+            agenda_header.insert_before(BeautifulSoup(cc_section, 'html.parser'))
+
+            _logger.info("Updated TO and CC sections successfully.")
+
+        # Update the agenda table
+        def update_agenda_table():
+            table_body = soup.find('tbody')
+            if not table_body:
+                raise UserError(_("No tbody found in the agenda table!"))
+
+            existing_serials = len([row for row in table_body.find_all('tr')])
+            serial = existing_serials + 1
+
+            for line in new_product_lines:
                 presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-
-                # Strip HTML tags from the description and preserve line breaks
                 description_soup = BeautifulSoup(line.description or 'N/A', 'html.parser')
-                description_text = description_soup.get_text()
-                description_text = description_text.replace('\n', '<br>')
+                description_text = description_soup.get_text().replace('\n', '<br>')
 
                 new_row = soup.new_tag('tr', style="border: 0px;")
-
                 serial_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
                 serial_td.string = str(serial)
                 new_row.append(serial_td)
@@ -428,123 +838,17 @@ class OdooCalendarInheritence(models.Model):
                 table_body.append(new_row)
                 serial += 1
 
-        self.last_write_date = fields.Datetime.now()
+            _logger.info("Updated agenda table successfully.")
 
-        # Convert the modified soup object back to a string
+        update_agenda_table()
+
+        # Save changes back to the article
+        self.last_write_date = fields.Datetime.now()
         updated_content = str(soup)
 
-        article_values = {
-            'body': Markup(updated_content),
-        }
-        self.article_id.sudo().write(article_values)
-
-    # def action_add_knowledge_article(self):
-    #         if not self.article_id:
-    #             raise ValidationError("No Article for these records in Knowledge Module!")
-    #
-    #         filtered_product_lines_2 = [line for line in self.product_line_ids if
-    #                                     line.create_date >= self.last_write_date]
-    #
-    #         if not filtered_product_lines_2:
-    #             raise UserError(
-    #                 _("No new data added to the agenda! Please add data before making changes to the article!"))
-    #
-    #         existing_content = self.article_id.body
-    #         soup = BeautifulSoup(existing_content, 'html.parser')
-    #
-    #         # Find the existing table body
-    #         table_body = soup.find('tbody')
-    #         if not table_body:
-    #             raise UserError(_("No existing table found in the article!"))
-    #
-    #         filtered_product_lines = [line for line in self.product_line_ids if line.create_date < self.last_write_date]
-    #         serial = len(filtered_product_lines) + 1
-    #
-    #         for line in self.product_line_ids:
-    #             if line.create_date >= self.last_write_date:
-    #                 presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-    #
-    #                 new_row = soup.new_tag('tr', style="border: 0px;")
-    #
-    #                 serial_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #                 serial_td.string = str(serial)
-    #                 new_row.append(serial_td)
-    #
-    #                 description_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #                 description_td.string = line.description or 'N/A'
-    #                 new_row.append(description_td)
-    #
-    #                 presenters_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #                 presenters_td.string = presenters or 'N/A'
-    #                 new_row.append(presenters_td)
-    #
-    #                 table_body.append(new_row)
-    #                 serial += 1
-    #
-    #         self.last_write_date = fields.Datetime.now()
-    #
-    #         # Convert the modified soup object back to a string
-    #         updated_content = str(soup)
-    #
-    #         article_values = {
-    #             'body': Markup(updated_content),
-    #         }
-    #         self.article_id.sudo().write(article_values)
-
-    # def action_add_knowledge_article(self):
-    #     if not self.article_id:
-    #         raise ValidationError("No Article for these records in Knowledge Module!")
-    #
-    #     filtered_product_lines_2 = [line for line in self.product_line_ids if line.create_date >= self.last_write_date]
-    #
-    #     if not filtered_product_lines_2:
-    #         raise UserError(_("No new data added to the agenda! Please add data before making changes to the article!"))
-    #
-    #     existing_content = self.article_id.body
-    #     soup = BeautifulSoup(existing_content, 'html.parser')
-    #
-    #     # Find the existing table body
-    #     table_body = soup.find('tbody')
-    #     if not table_body:
-    #         raise UserError(_("No existing table found in the article!"))
-    #
-    #     filtered_product_lines = [line for line in self.product_line_ids if line.create_date < self.last_write_date]
-    #     serial = len(filtered_product_lines) + 1
-    #
-    #     for line in self.product_line_ids:
-    #         if line.create_date >= self.last_write_date:
-    #             presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-    #
-    #             # Strip HTML tags from the description
-    #             description_soup = BeautifulSoup(line.description or 'N/A', 'html.parser')
-    #             description_text = description_soup.get_text()
-    #
-    #             new_row = soup.new_tag('tr', style="border: 0px;")
-    #
-    #             serial_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #             serial_td.string = str(serial)
-    #             new_row.append(serial_td)
-    #
-    #             description_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #             description_td.string = description_text
-    #             new_row.append(description_td)
-    #
-    #             presenters_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-    #             presenters_td.string = presenters or 'N/A'
-    #             new_row.append(presenters_td)
-    #
-    #             table_body.append(new_row)
-    #             serial += 1
-    #
-    #     self.last_write_date = fields.Datetime.now()
-    #
-    #     # Convert the modified soup object back to a string
-    #     updated_content = str(soup)
-    #
-    #     article_values = {
-    #         'body': Markup(updated_content),
-    #     }
-    #     self.article_id.sudo().write(article_values)
+        # Log updated content
+        _logger.info("Updated article content successfully.")
+        self.article_id.sudo().write({'body': Markup(updated_content)})
 
     def action_create_agenda_descriptions(self):
         company_id = self.env.company
@@ -749,23 +1053,49 @@ class OdooCalendarInheritence(models.Model):
     def action_add_attendees(self):
         partners = []
         for partner in self.partner_ids:
+            # Retrieve the related employee and position
+            employee = self.env['hr.employee'].search([('work_email', '=', partner.email)], limit=1)
+            position = employee.job_id.name if employee else 'Unknown Position'
+
+            # Log the partner and their position
+            _logger.info("Attendee: %s, Position: %s", partner.name, position)
+
+            # Check if the partner is linked to a user
+            user = self.env['res.users'].search([('partner_id', '=', partner.id)], limit=1)
+            if user:
+                # Check the user's group membership
+                is_board_member = user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+                is_board_secretary = user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
+                # Log group membership
+                if is_board_member or is_board_secretary:
+                    role = 'Board Member' if is_board_member else 'Board Secretary'
+                    _logger.info("Attendee %s is a %s", partner.name, role)
+                else:
+                    _logger.info("Attendee %s does not belong to any board-related group", partner.name)
+
+            # Add attendee details
             partners.append(
                 Command.create(
                     {
                         'attendee_name': partner.name,
                         'email': partner.email,
                         'phone': partner.phone,
+                        'position': position,
+                        'is_board_member': is_board_member if user else False,
+                        'is_board_secretary': is_board_secretary if user else False,
                     }
                 )
             )
+
+        # Update the attendees list
         if not self.attendees_lines_ids:
             self.attendees_lines_ids = partners
-            self.has_attendees_added = True
-        # ￼
         else:
             self.attendees_lines_ids.sudo().unlink()
             self.attendees_lines_ids = partners
-            self.has_attendees_added = True
+
+        self.has_attendees_added = True
 
     def _calendar_meeting_end_tracker(self):
         calendar_meetings = self.env['calendar.event'].search([])
@@ -806,105 +1136,125 @@ class OdooCalendarInheritence(models.Model):
         # print(documents)
         self.document_count = len(documents)
 
-    # def action_open_documents(self):
-    #     # self.ensure_one()
-    #     company_id = self.env.company.id
-    #     current_time = fields.Datetime.now()
-    #     meeting_end_time = self.stop
-    #     active_user = self.env.user.partner_id.id
-    #     domain = [
-    #         '|',
-    #         '&', ('res_model', '=', 'product.template'), ('res_id', '=', self.product_id.id),
-    #         '&',
-    #         ('res_model', '=', 'product.template'),
-    #         ('res_id', 'in', self.product_id.product_variant_ids.ids),
-    #         ('partner_ids', 'in', [active_user]), ]
-    #     # if current_time and meeting_end_time:
-    #     # if current_time >= meeting_end_time: #If Meeting Has Ended
-    #     #     domain = [
-    #     #         '|',
-    #     #         '&', ('res_model', '=', 'product.template'), ('res_id', '=', self.product_id.id),
-    #     #         '&',
-    #     #         ('res_model', '=', 'product.template'),
-    #     #         ('res_id', 'in', self.product_id.product_variant_ids.ids),
-    #     #     ]
-    #     # else: #If meeting is still going!
-    #     #     domain = [
-    #     #         '|',
-    #     #         '&', ('res_model', '=', 'product.template'), ('res_id', '=', self.product_id.id),
-    #     #         '&',
-    #     #         ('res_model', '=', 'product.template'),
-    #     #         ('res_id', 'in', self.product_id.product_variant_ids.ids),
-    #     #         ('partner_ids', 'in', [active_user]),
-    #
-    #     for rec in self:
-    #         return {
-    #             'name': _('Documents'),
-    #             'type': 'ir.actions.act_window',
-    #             'res_model': 'product.document',
-    #             'view_mode': 'kanban,tree,form',
-    #             'context': {
-    #                 'default_res_model': rec.product_id._name,
-    #                 'default_res_id': rec.product_id.id,
-    #                 'default_company_id': company_id,
-    #             },
-    #             'domain': domain,
-    #             'target': 'current',
-    #             'help': """
-    #                 <p class="o_view_nocontent_smiling_face">
-    #                     %s
-    #                 </p>
-    #                 <p>
-    #                     %s
-    #                     <br/>
-    #                 </p>
-    #             """ % (
-    #                 _("Upload Documents to your agenda"),
-    #                 _("Use this feature to store Documents you would like to share with your members"),
-    #             )
-    #         }
+    def action_open_boardpack(self):
+        self.ensure_one()
+
+        # Fetch Confidential and NonConfidential boardpacks
+        confidential_attachment_id = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', 'ilike', f"{self.name}_Confidential.pdf")
+        ], limit=1)
+
+        non_confidential_attachment_id = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', 'ilike', f"{self.name}_NonConfidential.pdf")
+        ], limit=1)
+
+        # Check if user is Board Member or Board Secretary
+        is_board_member_or_secretary = self.env.user.has_group(
+            'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
+                                       self.env.user.has_group(
+                                           'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
+        # Determine accessible files
+        accessible_attachment_ids = []
+        if non_confidential_attachment_id:
+            accessible_attachment_ids.append(non_confidential_attachment_id.id)
+        if is_board_member_or_secretary and confidential_attachment_id:
+            accessible_attachment_ids.append(confidential_attachment_id.id)
+
+        # Log accessible attachments
+        _logger.info("User %s is accessing the following attachments: %s",
+                     self.env.user.name, accessible_attachment_ids)
+
+        # Check if no files are accessible
+        if not accessible_attachment_ids:
+            _logger.info("No accessible attachments for user %s on event %s", self.env.user.name, self.name)
+            return {'type': 'ir.actions.act_window_close'}
+
+        # Fetch matching product documents
+        matching_documents = self.env['product.document'].search(
+            [('ir_attachment_id', 'in', accessible_attachment_ids)])
+        _logger.info("Matching Product Document count for user %s: %d", self.env.user.name, len(matching_documents))
+
+        # Log retrieved document names
+        _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
+                     matching_documents.mapped('name'))
+
+        # Return action to open documents
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Documents',
+            'res_model': 'product.document',
+            'view_mode': 'kanban,tree,form',
+            'domain': [('id', 'in', matching_documents.ids)],
+            'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
+        }
 
     def action_open_documents(self):
         self.ensure_one()
 
-        # Collect attachment IDs from all product lines' `pdf_attachment` fields
-        attachment_ids = []
+        # Fetch Confidential and NonConfidential boardpacks
+        confidential_attachment_ids = []
+        non_confidential_attachment_ids = []
+        for suffix in ["Confidential", "NonConfidential"]:
+            attachment = self.env['ir.attachment'].search([
+                ('res_model', '=', 'calendar.event'),
+                ('res_id', '=', self.id),
+                ('name', 'ilike', f"{self.name}_{suffix}.pdf")
+            ], limit=1)
+            if attachment:
+                if "Confidential" in suffix:
+                    confidential_attachment_ids.append(attachment.id)
+                else:
+                    non_confidential_attachment_ids.append(attachment.id)
+            else:
+                _logger.info(f"No attachment found for {suffix} file for event {self.name}")
+
+        # Fetch unrestricted attachments
+        unrestricted_attachment_ids = []
         for line in self.product_line_ids:
             if not line.is_user_restricted:
-                attachment_ids.extend(line.pdf_attachment.ids)
+                unrestricted_attachment_ids.extend(line.pdf_attachment.ids)
 
-        if not attachment_ids:
+        # Check if user is Board Member or Board Secretary
+        is_board_member_or_secretary = self.env.user.has_group(
+            'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
+                                       self.env.user.has_group(
+                                           'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
+        # Combine all accessible files
+        all_attachment_ids = unrestricted_attachment_ids + non_confidential_attachment_ids
+        if is_board_member_or_secretary:
+            all_attachment_ids += confidential_attachment_ids
+
+        # Log the final list of accessible attachments
+        _logger.info("User %s is accessing the following attachments: %s",
+                     self.env.user.name, all_attachment_ids)
+
+        # Check if no files are found
+        if not all_attachment_ids:
             _logger.info("No accessible attachments for user %s on event %s", self.env.user.name, self.name)
-            return {'type': 'ir.actions.act_window_close'}  # Close action if no accessible attachments
+            return {'type': 'ir.actions.act_window_close'}
 
-        # Search for documents based on the collected attachment IDs
-        matching_documents = self.env['product.document'].search([('ir_attachment_id', 'in', attachment_ids)])
+        # Fetch matching product documents
+        matching_documents = self.env['product.document'].search([('ir_attachment_id', 'in', all_attachment_ids)])
+        _logger.info("Matching Product Document count for user %s: %d", self.env.user.name, len(matching_documents))
 
-        _logger.info("Matching Product Document IDs: %s", matching_documents.ids)
+        # Log retrieved document names
+        _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
+                     matching_documents.mapped('name'))
 
+        # Return action to open documents
         return {
-            'name': _('Documents'),
             'type': 'ir.actions.act_window',
+            'name': 'Documents',
             'res_model': 'product.document',
             'view_mode': 'kanban,tree,form',
-            'context': {
-                'default_res_model': 'product.template',
-                'default_company_id': self.env.company.id,
-            },
-            'domain': [('ir_attachment_id', 'in', attachment_ids)],
-            'target': 'current',
-            'help': """
-                <p class="o_view_nocontent_smiling_face">
-                    %s
-                </p>
-                <p>
-                    %s
-                    <br/>
-                </p>
-            """ % (
-                _("Upload Documents to your agenda"),
-                _("Use this feature to store Documents you would like to share with your members"),
-            )
+            'domain': [('id', 'in', matching_documents.ids)],
+            'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
 
     def action_points_kanban(self):
@@ -1168,41 +1518,154 @@ class OdooCalendarInheritence(models.Model):
             for page in pdf_reader.pages:
                 pdf_writer.add_page(page)
 
-    def action_merge_documents(self):
+    def save_merged_document(self, pdf_stream, filename_suffix, description):
         """
-        Merge all supported attachments (PDFs, images, DOCX) from the product lines of the event into a single document.
-        Additionally, include a cover page generated from the article HTML structure with the company logo.
+        Save a single PDF document to `ir.attachment` and associate it with `product.document`.
         """
         self.ensure_one()
 
-        # Step 1: Fetch the company logo as binary and convert to Base64
-        company = self.env.company  # Fetch the current company
-        if not company.logo:
-            _logger.error("No logo found for the current company.")
-            raise UserError(_("No logo found for the current company."))
+        # Reset the stream pointer before reading
+        if pdf_stream.seekable():
+            pdf_stream.seek(0)
 
-        try:
-            company_logo_base64 = base64.b64encode(company.logo).decode('utf-8')
-            _logger.info("Company logo successfully converted to Base64.")
-        except Exception as e:
-            _logger.error("Error converting company logo to Base64: %s", str(e))
-            raise UserError(_("Error processing company logo: %s") % str(e))
+        filename = f"{self.name}{filename_suffix}"
 
-        # Step 2: Generate cover PDF from article HTML
+        # Remove existing attachments with the same name
+        existing_attachment = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', '=', filename),
+        ])
+        if existing_attachment:
+            existing_attachment.unlink()
+            _logger.info("Existing attachment '%s' removed.", filename)
+
+        # Set context to skip watermark and create the attachment
+        attachment_env = self.env['ir.attachment'].with_context(skip_watermark=True)
+        merged_attachment = attachment_env.create({
+            'name': filename,
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_stream.read()),
+            'mimetype': 'application/pdf',
+            'res_model': 'calendar.event',
+            'res_id': self.id,
+        })
+
+        _logger.info("New attachment created: %s with ID: %d", merged_attachment.name, merged_attachment.id)
+
+        # Associate with product.document
+        product_document = self.env['product.document'].search([('ir_attachment_id', '=', merged_attachment.id)])
+        if not product_document:
+            product_document = self.env['product.document'].create({
+                'name': merged_attachment.name,
+                'ir_attachment_id': merged_attachment.id,
+                'description': description,
+            })
+            _logger.info("New product.document created for attachment: %s", merged_attachment.name)
+        else:
+            product_document.write({
+                'name': merged_attachment.name,
+                'description': description,
+            })
+            _logger.info("Existing product.document updated for attachment: %s", merged_attachment.name)
+
+        return merged_attachment
+
+    def add_watermark_to_pdf(self, page):
+        """
+        Apply watermark to a PDF page unless the context specifies no restrictions.
+        """
+        # Check context or conditions to skip watermarking
+        if self.env.context.get('skip_watermark', False):
+            return page
+
+        # Apply watermark as usual
+        page_width = int(float(page.mediabox.width))
+        page_height = int(float(page.mediabox.height))
+
+        # Create a blank canvas for the page
+        page_image = Image.new('RGB', (page_width, page_height), color=(255, 255, 255))  # White background
+        blurred_image = page_image.filter(ImageFilter.GaussianBlur(radius=10))
+
+        # Draw watermark text
+        draw = ImageDraw.Draw(blurred_image)
+        font = ImageFont.load_default()  # Load a default font
+        watermark_text = "RESTRICTED"
+        text_width, text_height = draw.textsize(watermark_text, font=font)
+        text_position = ((page_width - text_width) // 2, (page_height - text_height) // 2)
+        draw.text(text_position, watermark_text, fill=(255, 0, 0), font=font)
+
+        # Convert to PDF page
+        rgb_image = blurred_image.convert('RGB')
+        image_pdf = io.BytesIO()
+        rgb_image.save(image_pdf, format='PDF')
+        image_pdf.seek(0)
+        image_reader = PdfReader(image_pdf)
+
+        # Merge watermark with original page
+        page.merge_page(image_reader.pages[0])
+        return page
+
+    def _classify_attachments(self):
+        """
+        Classify attachments into confidential and non-confidential based on product lines.
+        """
+        confidential_attachments = []
+        non_confidential_attachments = []
+
+        for line in self.product_line_ids:
+            if line.confidential:
+                confidential_attachments.extend(line.pdf_attachment)
+            else:
+                non_confidential_attachments.extend(line.pdf_attachment)
+
+        return confidential_attachments, non_confidential_attachments
+
+    def _merge_attachments(self, cover_stream, attachments, restricted=True):
+        """
+        Merge cover stream with provided attachments.
+        For restricted users, apply a watermark to all pages of the attachments.
+        """
+        self.ensure_one()
+        merged_stream = io.BytesIO()
+        pdf_writer = PdfWriter()
+
+        # Add the cover page without watermark
+        cover_reader = PdfReader(cover_stream)
+        pdf_writer.add_page(cover_reader.pages[0])
+
+        # Check if the user is restricted
+        is_restricted_user = restricted and self.env.user.partner_id not in self.Restricted
+
+        # Add attachments with or without watermark
+        for attachment in attachments:
+            attachment_reader = PdfReader(io.BytesIO(base64.b64decode(attachment.datas)))
+            for page in attachment_reader.pages:
+                if is_restricted_user:
+                    # Apply watermark to the page for restricted users
+                    page = self._add_watermark_to_page(page)
+                pdf_writer.add_page(page)
+
+        # Write the final merged PDF
+        pdf_writer.write(merged_stream)
+        merged_stream.seek(0)
+        return merged_stream
+
+    def _generate_cover_html(self, company_logo_base64):
+        """
+        Generate HTML content for the cover page, including the company logo.
+        Add CSS for page breaks to ensure proper content flow in the PDF.
+        """
         if not self.article_id or not self.article_id.body:
             raise UserError(_("No associated article found to generate the cover page."))
 
         html_content = self.article_id.body
-
-        # Ensure the HTML has absolute URLs for resources like images
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         html_content = html_content.replace('/web/image', f'{base_url}/web/image')
 
-        # Add local Bootstrap CSS link to the HTML content
         bootstrap_url = f'{base_url}/odoo_calendar_inheritence/static/src/bootstrap-5.1.3/css/bootstrap.min.css'
         bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
 
-        # Inject Bootstrap and company logo into the head of the HTML
         html_content_with_logo = f"""
         <!DOCTYPE html>
         <html lang="en">
@@ -1210,22 +1673,44 @@ class OdooCalendarInheritence(models.Model):
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             {bootstrap_css}
+            <style>
+                .page-break {{ 
+                    page-break-before: always; 
+                    margin-top: 10mm;
+                }}
+            </style>
         </head>
         <body>
+        """
+        if company_logo_base64:
+            html_content_with_logo += f"""
             <div style="text-align: center; margin-bottom: 20px;">
-                <img src="data:image/png;base64,{company_logo_base64}" alt="Company Logo" style="width: 150px; height: auto;">
+                <img src="data:image/png;base64,{company_logo_base64}">
             </div>
-            {html_content}
+            """
+
+        # Split content and add page breaks
+        html_content_with_logo += f"""
+        <div>
+            <div class="content-section">
+                {html_content}
+            </div>
+            <div class="page-break"></div>
+            <div class="content-section">
+                <h3>Additional Content</h3>
+                <p>Include more details here.</p>
+            </div>
+        </div>
         </body>
         </html>
         """
 
-        # Debug: Save HTML content for inspection
-        with open('/tmp/test_cover_page.html', 'w') as f:
-            f.write(html_content_with_logo)
-            _logger.info("Cover page HTML saved to /tmp/test_cover_page.html")
+        return html_content_with_logo
 
-        # Try to generate the PDF from the article's HTML content
+    def _generate_cover_pdf(self, html_content_with_logo):
+        """
+        Generate a PDF from the cover page HTML content.
+        """
         pdf_cover_stream = io.BytesIO()
         try:
             options = {
@@ -1233,7 +1718,13 @@ class OdooCalendarInheritence(models.Model):
                 'quiet': '',
                 'encoding': 'UTF-8',
                 'disable-smart-shrinking': None,
+                'margin-top': '10mm',
+                'margin-bottom': '10mm',
+                'margin-left': '10mm',
+                'margin-right': '10mm',
+                'page-size': 'A4',
             }
+            # Generate PDF
             pdf_data = pdfkit.from_string(html_content_with_logo, False, options=options)
             pdf_cover_stream.write(pdf_data)
             _logger.info("Cover page PDF generated successfully.")
@@ -1242,93 +1733,111 @@ class OdooCalendarInheritence(models.Model):
             raise UserError(_("Failed to generate cover PDF: %s") % str(e))
 
         pdf_cover_stream.seek(0)
-        pdf_writer = PdfWriter()
+        return pdf_cover_stream
 
-        # Add the cover page PDF to the writer
-        cover_pdf_reader = PdfReader(pdf_cover_stream)
-        for page in cover_pdf_reader.pages:
-            pdf_writer.add_page(page)
+    def _get_company_logo_base64(self):
+        """
+        Fetch the company logo and return it as a Base64-encoded string.
+        """
+        company = self.env.company
+        if company.logo:
+            return base64.b64encode(company.logo).decode('utf-8')
+        else:
+            return None
 
-        # Step 3: Add other attachments to the writer
-        attachments = self.mapped('product_line_ids.pdf_attachment')
-        if not attachments:
-            raise UserError(_("No attachments found to merge."))
-
-        for attachment in attachments:
-            try:
-                if attachment.mimetype == 'application/pdf':
-                    # Add PDF to writer
-                    pdf_data = base64.b64decode(attachment.datas)
-                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                    for page in pdf_reader.pages:
-                        pdf_writer.add_page(page)
-                elif attachment.mimetype.startswith('image/'):
-                    # Convert image to PDF and add
-                    pdf_data = self.image_to_pdf(attachment.datas)
-                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                    for page in pdf_reader.pages:
-                        pdf_writer.add_page(page)
-                elif attachment.mimetype == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                    # Convert DOCX to PDF and add
-                    pdf_data = self.docx_to_pdf(attachment.datas)
-                    pdf_reader = PdfReader(io.BytesIO(pdf_data))
-                    for page in pdf_reader.pages:
-                        pdf_writer.add_page(page)
-                else:
-                    # Add placeholder for unsupported media files
-                    self.add_media_placeholder(pdf_writer, [attachment])
-            except Exception as e:
-                _logger.error("Error processing attachment %s: %s", attachment.name, str(e))
-                raise UserError(_("Error processing attachment %s: %s") % (attachment.name, str(e)))
-
-        if not pdf_writer.pages:
-            raise UserError(_("No valid documents found in attachments."))
-
-        # Step 4: Write the merged PDF to a stream
-        merged_pdf_stream = io.BytesIO()
-        pdf_writer.write(merged_pdf_stream)
-        merged_pdf_stream.seek(0)
-
-        # Step 5: Create a new attachment with the merged content
-        merged_attachment = self.env['ir.attachment'].create({
-            'name': f'Merged Document - {self.name}.pdf',
-            'type': 'binary',
-            'datas': base64.b64encode(merged_pdf_stream.read()),
-            'mimetype': 'application/pdf',
-            'res_model': 'calendar.event',
-            'res_id': self.id,
-        })
-
-        _logger.info("Merged document successfully created: %s", merged_attachment.name)
-
-        return {
-            'type': 'ir.actions.act_url',
-            'url': f'/web/content/{merged_attachment.id}',
-            'target': 'new',
-        }
-
-    def action_view_documents(self):
+    def action_merge_documents(self):
+        """
+        Merge attachments into two distinct documents:
+        Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
+        Stream the appropriate document based on user roles.
+        """
         self.ensure_one()
 
-        # Collect all `pdf_attachment` documents from the product lines
-        attachment_ids = self.mapped('calendar_event_product_line_ids.pdf_attachment').ids
+        # Step 1: Fetch the company logo and generate cover page
+        company_logo_base64 = self._get_company_logo_base64()
+        html_content_with_logo = self._generate_cover_html(company_logo_base64)
 
-        if not attachment_ids:
-            raise ValidationError(_("No documents available to view."))
+        # Generate the cover page PDF
+        pdf_cover_stream = self._generate_cover_pdf(html_content_with_logo)
 
-        # Open the documents in a list view
-        return {
-            'name': _('Documents'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'ir.attachment',
-            'view_mode': 'kanban,tree,form',
-            'domain': [('id', 'in', attachment_ids)],
-            'target': 'current',
-            'context': {
-                'default_res_model': 'calendar.event',
-                'default_res_id': self.id,
-            },
+        # Step 2: Classify attachments into confidential and non-confidential
+        confidential_attachments, non_confidential_attachments = self._classify_attachments()
+
+        _logger.info("Confidential Attachments: %d", len(confidential_attachments))
+        _logger.info("Non-Confidential Attachments: %d", len(non_confidential_attachments))
+
+        if not confidential_attachments and not non_confidential_attachments:
+            _logger.warning("No attachments found to merge.")
+            return {}
+
+        # Step 3: Generate streams
+        # For Confidential: Merge cover page with all attachments
+        confidential_stream = self._merge_attachments(
+            pdf_cover_stream, confidential_attachments + non_confidential_attachments, restricted=True
+        )
+
+        # For Non-Confidential: Merge cover page with only non-confidential attachments
+        non_confidential_stream = self._merge_attachments(
+            pdf_cover_stream, non_confidential_attachments, restricted=False
+        )
+
+        # Step 4: Save the documents
+        saved_documents = {
+            "Confidential": self.save_merged_document(
+                confidential_stream,
+                filename_suffix="_Confidential.pdf",
+                description=f"Confidential document for event {self.name}"
+            ),
+            "NonConfidential": self.save_merged_document(
+                non_confidential_stream,
+                filename_suffix="_NonConfidential.pdf",
+                description=f"Non-confidential document for event {self.name}"
+            ),
         }
+
+        # Log details of saved documents
+        _logger.info("Number of files saved: %d", len(saved_documents))
+        for doc_type, attachment in saved_documents.items():
+            if attachment:
+                _logger.info("Saved document: %s (Type: %s)", attachment.name, doc_type)
+            else:
+                _logger.warning("No document saved for type: %s", doc_type)
+
+        # Step 5: Determine user access level
+        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
+                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+
+        # if user_has_access:
+        #     # Stream Confidential Document
+        #     confidential_document_url = "/web/content/%s" % saved_documents[
+        #         "Confidential"].id if saved_documents.get("Confidential") else ''
+        #     if confidential_document_url:
+        #         return {
+        #             'type': 'ir.actions.act_url',
+        #             'url': confidential_document_url,
+        #             'target': 'new',  # Opens the URL in a new tab
+        #         }
+        #     else:
+        #         _logger.warning("No Confidential document to preview.")
+        #         return {}
+        # else:
+        #     # Stream Non-Confidential Document
+        #     non_confidential_document_url = "/web/content/%s" % saved_documents[
+        #         "NonConfidential"].id if saved_documents.get("NonConfidential") else ''
+        #     if non_confidential_document_url:
+        #         return {
+        #             'type': 'ir.actions.act_url',
+        #             'url': non_confidential_document_url,
+        #             'target': 'new',  # Opens the URL in a new tab
+        #         }
+        #     else:
+        #         _logger.warning("No NonConfidential document to preview.")
+        #         return {}
+
+        action = self.action_open_boardpack()
+
+        # Explicitly return the action to propagate it
+        return action
 
 
 class AgendaLines(models.Model):
