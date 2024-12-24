@@ -2,11 +2,14 @@ from PyPDF2 import PdfFileMerger
 from odoo.exceptions import UserError
 import base64
 import io
+import logging
 from markupsafe import Markup
 from odoo.tools.safe_eval import safe_eval
 from odoo.tools import html_escape
 from odoo import models, fields, api, _
 
+
+_logger = logging.getLogger(__name__)
 
 class ProductDocument(models.Model):
     _inherit = 'product.document'
@@ -16,10 +19,24 @@ class ProductDocument(models.Model):
     product_document_id = fields.Many2one('product.document', string='Document ID')
     shown_on_product_page = fields.Boolean(default=True, store=True)
     user_ids = fields.Many2many('res.users')
-    partner_ids = fields.Many2many('res.partner')
     ir_attachment_custom_id = fields.Many2one('ir.attachment')
     mime_type = fields.Char(related='ir_attachment_id.mimetype')
     is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
+    partner_ids = fields.Many2many('res.partner', string="Document visible to:")
+
+    def write(self, values):
+        res = super(ProductDocument, self).write(values)
+
+        if 'partner_ids' in values:
+            # Get related `calendar.event.product.line` records
+            product_lines = self.env['calendar.event.product.line'].search(
+                [('product_document_id', 'in', self.ids)]
+            )
+            # Recompute the `Restricted` field
+            product_lines._compute_restricted_attendees()
+
+        return res
+
 
     @api.depends('ir_attachment_id')
     def _compute_is_pdf_document(self):
@@ -31,7 +48,6 @@ class ProductDocument(models.Model):
                     rec.is_pdf = False
             else:
                 raise UserError(_('No attachment found!'))
-
 
     def merge_selected_pdfs(self):
         # print('Starting PDF merge process')
@@ -82,3 +98,13 @@ class ProductDocument(models.Model):
             'res_id': article.id,
             'target': 'new',
         }
+
+
+class ProductTemplate(models.Model):
+    _inherit = 'product.template'
+
+    document_ids = fields.Many2many(
+        'product.document',
+        'product_document_product_template_rel',  # the relation table name
+        string="Documents"
+    )

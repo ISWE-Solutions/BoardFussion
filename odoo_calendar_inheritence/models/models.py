@@ -376,13 +376,13 @@ class OdooCalendarInheritence(models.Model):
             html_content += Markup("""
                 <tr style="border: 0px;">
                     <td style="padding: 10px; border: 0px;">{counter}</td>
-                    <td style="padding: 10px; border: 0px;">{description}</td>
+                    <td style="padding: 10px; border: 0px;">{description}</td>s
                     <td style="padding: 10px; border: 0px;">{presenters}</td>
                 </tr>
             """).format(
                 counter=counter,
-                description=line.description or 'N/A',
-                presenters=presenters or 'N/A'
+                description=line.description or '',
+                presenters=presenters or ''
             )
             counter += 1
 
@@ -613,8 +613,8 @@ class OdooCalendarInheritence(models.Model):
                     </tr>
                 """).format(
                     counter=counter,
-                    description=line.description or 'N/A',
-                    presenters=presenters or 'N/A'
+                    description=line.description or '',
+                    presenters=presenters or ''
                 )
                 counter += 1
 
@@ -819,7 +819,7 @@ class OdooCalendarInheritence(models.Model):
 
             for line in new_product_lines:
                 presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-                description_soup = BeautifulSoup(line.description or 'N/A', 'html.parser')
+                description_soup = BeautifulSoup(line.description or '', 'html.parser')
                 description_text = description_soup.get_text().replace('\n', '<br>')
 
                 new_row = soup.new_tag('tr', style="border: 0px;")
@@ -832,7 +832,7 @@ class OdooCalendarInheritence(models.Model):
                 new_row.append(description_td)
 
                 presenters_td = soup.new_tag('td', style="padding: 10px; border: 0px;")
-                presenters_td.string = presenters or 'N/A'
+                presenters_td.string = presenters or ''
                 new_row.append(presenters_td)
 
                 table_body.append(new_row)
@@ -870,7 +870,7 @@ class OdooCalendarInheritence(models.Model):
                 mom_description_content += Markup("""
                             {description}<hr>
                             """).format(
-                    description=line.description or 'N/A'
+                    description=line.description or ''
                 )
                 counter += 1
             attendees = self.action_confirm_attendees()

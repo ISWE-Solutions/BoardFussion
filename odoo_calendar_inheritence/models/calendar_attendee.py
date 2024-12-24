@@ -8,6 +8,14 @@ from odoo.tools.misc import clean_context
 class Calendar_attendee(models.Model):
     _inherit = 'calendar.attendee'
 
+
+    role_id = fields.Many2one(
+        'calendar.attendee.role',
+        string="Role",
+        ondelete='restrict',
+        help="Select or create an attendee role."
+    )
+
     def _send_custom_mail_to_attendees(self, mail_template, force_send=True):
         """ Send mail for event invitation to event attendees.
             :param mail_template: a mail.template record
@@ -63,3 +71,10 @@ class Calendar_attendee(models.Model):
                     attachment_ids=attachment_ids,
                     force_send=force_send,
                 )
+
+
+class CalendarAttendeeRole(models.Model):
+    _name = 'calendar.attendee.role'
+    _description = 'Attendee Role'
+
+    name = fields.Char(string="Role Name", required=True)

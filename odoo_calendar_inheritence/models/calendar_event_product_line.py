@@ -18,6 +18,7 @@ class CalendarEventProductLine(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     # calendar_id = fields.Many2one('calendar.event', string="Calendar Event")
     product_id = fields.Many2one('product.template', string="Product")
+    product_document_id = fields.Many2one('product.document', string="Product Document")
     quantity = fields.Float(string="Quantity")
     uom_id = fields.Many2one('uom.uom', string="Unit of Measure")
     agenda = fields.Char(string='Agenda', default=_('new'))
@@ -29,7 +30,6 @@ class CalendarEventProductLine(models.Model):
     time = fields.Char(string='Time')
     pdf_attachment = fields.Many2many('ir.attachment', string='Add Attachments')
     calendar_id = fields.Many2one('calendar.event', string="Calendar Event", required=True)
-
     Restricted = fields.Many2many(
         'res.partner',
         'calendar_event_product_line_res_partner_rel',  # Unique relation table name
@@ -45,6 +45,35 @@ class CalendarEventProductLine(models.Model):
     user_is_board_member_or_secretary = fields.Boolean(compute='_compute_user_is_board_member_or_secretary',
                                                        store=False)
     display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
+
+    @api.onchange('confidential')
+    def _onchange_confidential(self):
+        for record in self:
+            if record.confidential and record.calendar_id:
+                # Get board member and board secretary groups
+                board_member_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_member',
+                                                  raise_if_not_found=False)
+                board_secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary',
+                                                     raise_if_not_found=False)
+
+                if board_member_group or board_secretary_group:
+                    # Fetch all attendees in the Restricted field who are part of either group
+                    board_member_partners = self.env['res.partner'].search([
+                        ('user_ids.groups_id', 'in', board_member_group.id if board_member_group else 0)
+                    ])
+                    board_secretary_partners = self.env['res.partner'].search([
+                        ('user_ids.groups_id', 'in', board_secretary_group.id if board_secretary_group else 0)
+                    ])
+                    valid_partners = (board_member_partners | board_secretary_partners).ids
+
+                    # Filter Restricted to keep only valid partners
+                    record.Restricted = [(6, 0, list(set(valid_partners) & set(record.Restricted.ids)))]
+                else:
+                    # If groups are not defined, clear the Restricted list
+                    record.Restricted = [(5,)]
+            elif not record.confidential:
+                # When confidential is set to False, keep the original attendees
+                record.Restricted = record.calendar_id.partner_ids.ids
 
     @api.depends('confidential')
     def _compute_user_is_board_member_or_secretary(self):
@@ -62,16 +91,37 @@ class CalendarEventProductLine(models.Model):
                 record.display_description = 'Confidential'
             else:
                 record.display_description = html2plaintext(record.description or "")
-            _logger.info("Computed display_description: %s", record.display_description)
+            # _logger.info("Computed display_description: %s", record.display_description)
 
-
-    @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id')  # Include creator in dependencies
+    @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
     def _compute_restricted_attendees(self):
         for record in self:
             if record.calendar_id:
-                # Combine attendees and the creator of the event
                 attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
+                _logger.info(f"Setting Restricted for record ID {record.id}: {attendees_and_creator.ids}")
                 record.Restricted = attendees_and_creator
+            elif record.product_document_id:
+                record.Restricted = record.product_document_id.partner_ids
+    #
+    # def _inverse_restricted_attendees(self):
+    #     for line in self:
+    #         if line.product_document_id:
+    #             _logger.info(
+    #                 f"Syncing Restricted from calendar.event.product.line ID {line.id} to product.document ID {line.product_document_id.id}. "
+    #                 f"Values: {line.Restricted.ids}"
+    #             )
+    #             line.product_document_id.partner_ids = line.Restricted
+
+
+    @api.depends('Restricted')
+    def _inverse_restricted_attendees(self):
+        for line in self:
+            _logger.info(
+                f"Before updating partner_ids in ProductDocument (ID: {line.product_document_id.id}): {line.product_document_id.partner_ids.ids}")
+            if line.product_document_id:
+                line.product_document_id.partner_ids = line.Restricted
+                _logger.info(
+                    f"After updating partner_ids in ProductDocument (ID: {line.product_document_id.id}): {line.product_document_id.partner_ids.ids}")
 
     @api.depends('Restricted')
     def _compute_is_user_restricted(self):
@@ -90,12 +140,19 @@ class CalendarEventProductLine(models.Model):
     def create(self, values):
         rtn = super(CalendarEventProductLine, self).create(values)
         document_model = self.env['product.document']
+
         for record in rtn:
             record.product_id = record.calendar_id.product_id.id
             product = record.product_id
+
+            # Log to track what is being processed
+            _logger.info(f"Creating document for Calendar Event Product Line {record.id} with Product {product.id}")
+
             if record.pdf_attachment:
                 for attachment in record.pdf_attachment:
-                    attachment_data = attachment.datas
+                    _logger.info(f"Processing attachment: {attachment.name}")
+
+                    # Create new document for each attachment
                     new_document = document_model.sudo().create(
                         {
                             'res_model': 'product.template',
@@ -104,57 +161,70 @@ class CalendarEventProductLine(models.Model):
                             'ir_attachment_id': attachment.id,
                         }
                     )
-                record.calendar_id.compute_visible_users()
+                    _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
+
+            # Recalculate visible users after document creation
+            record.calendar_id.compute_visible_users()
+
         return rtn
 
     def write(self, values):
-
         if 'agenda' in values and values['agenda']:
             self._check_unique_agenda(values['agenda'], self.id)
-        # _logger.info('------------------->',values)
-        if 'pdf_attachment' in values:
-            create_doc=[]
-            create_list_ids=[]
-            unlink_doc=[]
-            unlink_list_ids=[]
 
+        # Initialize lists to track created and removed documents
+        create_doc = []
+        create_list_ids = []
+        unlink_doc = []
+        unlink_list_ids = []
+
+        if 'pdf_attachment' in values:
             for attachment in values['pdf_attachment']:
-                if attachment[0] == 4:
-                    rec_id=attachment[1]
+                # Handling created attachments
+                if attachment[0] == 4:  # create
+                    rec_id = attachment[1]
                     create_list_ids.append(rec_id)
 
-                elif attachment[0] == 3:
+                # Handling removed attachments
+                elif attachment[0] == 3:  # unlink
                     rec_id = attachment[1]
-                    is_remove = True
                     unlink_list_ids.append(rec_id)
-                    # doc = self.env['ir.attachment'].browse(unlink_list_ids)
+
+            # Handle creation of new documents
             if create_list_ids:
-                att = self.env['ir.attachment'].browse(create_list_ids)
-                for rec in att:
-                    attachment_data =rec.datas
-                    attachment_bytes = base64.b64encode(attachment_data)
+                attachments = self.env['ir.attachment'].browse(create_list_ids)
+                for rec in attachments:
+                    _logger.info(f"Creating product document for attachment {rec.name} (ID: {rec.id})")
                     create_doc.append({
                         'res_model': 'product.template',
                         'name': rec.name,
                         'res_id': self.product_id.id,
-                        'ir_attachment_id': rec.id
-                        # 'user_ids':[(6, 0, self.env.user.id)],
+                        'ir_attachment_id': rec.id,
                     })
 
                 if create_doc:
+                    # Create product documents
                     doc_res = self.env['product.document'].sudo().create(create_doc)
-            if unlink_list_ids:
-                res=self.env['product.document'].sudo().search([('ir_attachment_id','in',unlink_list_ids)])
-                # _logger.info('Unlink--',res)
-                if res:
-                    res.sudo().unlink()
-                # attachment_data = attachment.datas
-                # attachment_bytes = base64.b64encode(attachment_data)
-        self.calendar_id.compute_visible_users()
-        res=super(CalendarEventProductLine, self).write(values)
-        # _logger.info(res)
-        return res
+                    _logger.info(f"Created {len(doc_res)} product documents for attachments")
 
+            # Handle unlinking of documents
+            if unlink_list_ids:
+                docs_to_unlink = self.env['product.document'].sudo().search(
+                    [('ir_attachment_id', 'in', unlink_list_ids)])
+                if docs_to_unlink:
+                    _logger.info(f"Unlinking {len(docs_to_unlink)} product documents")
+                    docs_to_unlink.sudo().unlink()
+
+        # Recalculate visible users after the write operation
+        self.calendar_id.compute_visible_users()
+
+        # Call the parent method to complete the write operation
+        res = super(CalendarEventProductLine, self).write(values)
+
+        # Optionally log the final result
+        _logger.info(f"Write operation completed with result: {res}")
+
+        return res
 
     def unlink(self):
         unlink_list_ids=[]
