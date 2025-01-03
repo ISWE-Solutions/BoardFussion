@@ -1521,6 +1521,7 @@ class OdooCalendarInheritence(models.Model):
     def save_merged_document(self, pdf_stream, filename_suffix, description):
         """
         Save a single PDF document to `ir.attachment` and associate it with `product.document`.
+        Add invitees from `calendar.event` and specific groups to `partner_ids`.
         """
         self.ensure_one()
 
@@ -1529,18 +1530,47 @@ class OdooCalendarInheritence(models.Model):
             pdf_stream.seek(0)
 
         filename = f"{self.name}{filename_suffix}"
+        _logger.info("Processing file: %s (suffix: %s)", filename, filename_suffix)
 
-        # Remove existing attachments with the same name
+        # Log all invitees for the calendar event
+        invitees = self.partner_ids
+        _logger.info("Invitees for calendar.event '%s': %s", self.name, [partner.name for partner in invitees])
+
+        # Determine the confidentiality status
+        is_confidential = "NonConfidential" in filename_suffix
+        _logger.info("File confidentiality status: %s", "Confidential" if is_confidential else "Non-confidential")
+
+        # Define groups for board members and board secretaries
+        board_member_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+        board_secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
+        # Fetch partners dynamically based on groups
+        board_partners = self.env['res.partner'].search([
+            ('user_ids.groups_id', 'in', board_member_group.id)
+        ]) | self.env['res.partner'].search([
+            ('user_ids.groups_id', 'in', board_secretary_group.id)
+        ])
+
+        # Correct invitee logic
+        if is_confidential:
+            partners_to_add =invitees.ids
+            _logger.info("Adding board members and secretaries as partners for confidential file.")
+        else:
+            partners_to_add = board_partners.ids
+            _logger.info("Adding invitees as partners for non-confidential file. Invitee IDs: %s", partners_to_add)
+
+        # Search for existing attachments
         existing_attachment = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
             ('name', '=', filename),
-        ])
+        ], limit=1)
+
         if existing_attachment:
             existing_attachment.unlink()
             _logger.info("Existing attachment '%s' removed.", filename)
 
-        # Set context to skip watermark and create the attachment
+        # Create new attachment
         attachment_env = self.env['ir.attachment'].with_context(skip_watermark=True)
         merged_attachment = attachment_env.create({
             'name': filename,
@@ -1553,21 +1583,29 @@ class OdooCalendarInheritence(models.Model):
 
         _logger.info("New attachment created: %s with ID: %d", merged_attachment.name, merged_attachment.id)
 
-        # Associate with product.document
-        product_document = self.env['product.document'].search([('ir_attachment_id', '=', merged_attachment.id)])
+        # Create or update `product.document`
+        product_document = self.env['product.document'].search([('ir_attachment_id', '=', merged_attachment.id)],
+                                                               limit=1)
         if not product_document:
             product_document = self.env['product.document'].create({
                 'name': merged_attachment.name,
                 'ir_attachment_id': merged_attachment.id,
                 'description': description,
+                'partner_ids': [(6, 0, partners_to_add)],
             })
-            _logger.info("New product.document created for attachment: %s", merged_attachment.name)
+            _logger.info("New product.document created for attachment: %s with partners: %s",
+                         merged_attachment.name, partners_to_add)
         else:
+            # Merge existing partners with the new ones
+            current_partner_ids = product_document.partner_ids.ids
+            new_partner_ids = current_partner_ids + partners_to_add
             product_document.write({
                 'name': merged_attachment.name,
                 'description': description,
+                'partner_ids': [(6, 0, list(set(new_partner_ids)))]
             })
-            _logger.info("Existing product.document updated for attachment: %s", merged_attachment.name)
+            _logger.info("Updated product.document for attachment: %s with merged partners: %s",
+                         merged_attachment.name, list(set(new_partner_ids)))
 
         return merged_attachment
 

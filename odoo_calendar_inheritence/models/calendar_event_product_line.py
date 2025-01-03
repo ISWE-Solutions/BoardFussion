@@ -35,8 +35,9 @@ class CalendarEventProductLine(models.Model):
         'calendar_event_product_line_res_partner_rel',  # Unique relation table name
         string="Document visible to:",
         compute="_compute_restricted_attendees",
+        inverse="_inverse_restricted",
         store=True,
-        readonly =False,
+        readonly=False,
     )
 
     is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
@@ -93,24 +94,51 @@ class CalendarEventProductLine(models.Model):
                 record.display_description = html2plaintext(record.description or "")
             # _logger.info("Computed display_description: %s", record.display_description)
 
+    # @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
+    # def _compute_restricted_attendees(self):
+    #     for record in self:
+    #         if record.calendar_id:
+    #             attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
+    #             _logger.info(f"Setting Restricted for record ID {record.id}: {attendees_and_creator.ids}")
+    #             record.Restricted = attendees_and_creator
+    #         elif record.product_document_id:
+    #             record.Restricted = record.product_document_id.partner_ids
+
     @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
     def _compute_restricted_attendees(self):
         for record in self:
-            if record.calendar_id:
+            # Check if the context flag is set to avoid recursion
+            if self.env.context.get('prevent_restricted_update', False):
+                _logger.info(f"Skipping update of Restricted for record {record.id} due to recursion prevention flag.")
+                continue
+
+            _logger.info(
+                f"Before computing Restricted for record {record.id}: {record.Restricted.ids if record.Restricted else 'None'}")
+
+            # Begin setting Restricted with a context flag to prevent recursion
+            if record.product_document_id:
+                _logger.info(
+                    f"product_document_id exists. Setting Restricted to {record.product_document_id.partner_ids.ids}")
+                record.with_context(prevent_restricted_update=True).Restricted = record.product_document_id.partner_ids
+            elif record.calendar_id:
                 attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
-                _logger.info(f"Setting Restricted for record ID {record.id}: {attendees_and_creator.ids}")
-                record.Restricted = attendees_and_creator
-            elif record.product_document_id:
-                record.Restricted = record.product_document_id.partner_ids
-    #
-    # def _inverse_restricted_attendees(self):
-    #     for line in self:
-    #         if line.product_document_id:
-    #             _logger.info(
-    #                 f"Syncing Restricted from calendar.event.product.line ID {line.id} to product.document ID {line.product_document_id.id}. "
-    #                 f"Values: {line.Restricted.ids}"
-    #             )
-    #             line.product_document_id.partner_ids = line.Restricted
+                _logger.info(
+                    f"calendar_id exists. Setting Restricted to combined partners: {attendees_and_creator.ids}")
+                record.with_context(prevent_restricted_update=True).Restricted = attendees_and_creator
+            else:
+                _logger.warning(f"Neither product_document_id nor calendar_id found for record {record.id}")
+
+            _logger.info(
+                f"After computing Restricted for record {record.id}: {record.Restricted.ids if record.Restricted else 'None'}")
+
+
+    def _inverse_restricted(self):
+        for record in self:
+            if record.product_document_id:
+                _logger.info(f"Before updating partner_ids in Product Document for record {record.id}")
+                _logger.info(f"Old partner_ids: {record.product_document_id.partner_ids.ids}")
+                record.product_document_id.partner_ids = record.Restricted
+                _logger.info(f"Updated partner_ids: {record.product_document_id.partner_ids.ids}")
 
 
     @api.depends('Restricted')
@@ -145,22 +173,29 @@ class CalendarEventProductLine(models.Model):
             record.product_id = record.calendar_id.product_id.id
             product = record.product_id
 
-            # Log to track what is being processed
-            _logger.info(f"Creating document for Calendar Event Product Line {record.id} with Product {product.id}")
+            # Ensure product_document_id is set
+            if not record.product_document_id:
+                new_document = document_model.sudo().create({
+                    'res_model': 'product.template',
+                    'name': product.display_name,
+                    'res_id': product.id,
+                })
+                record.product_document_id = new_document.id
+                _logger.info(
+                    f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {record.id}")
 
+            # Process PDF attachments
             if record.pdf_attachment:
                 for attachment in record.pdf_attachment:
                     _logger.info(f"Processing attachment: {attachment.name}")
 
                     # Create new document for each attachment
-                    new_document = document_model.sudo().create(
-                        {
-                            'res_model': 'product.template',
-                            'name': attachment.name,
-                            'res_id': product.id,
-                            'ir_attachment_id': attachment.id,
-                        }
-                    )
+                    new_document = document_model.sudo().create({
+                        'res_model': 'product.template',
+                        'name': attachment.name,
+                        'res_id': product.id,
+                        'ir_attachment_id': attachment.id,
+                    })
                     _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
             # Recalculate visible users after document creation
@@ -172,7 +207,6 @@ class CalendarEventProductLine(models.Model):
         if 'agenda' in values and values['agenda']:
             self._check_unique_agenda(values['agenda'], self.id)
 
-        # Initialize lists to track created and removed documents
         create_doc = []
         create_list_ids = []
         unlink_doc = []
@@ -180,34 +214,30 @@ class CalendarEventProductLine(models.Model):
 
         if 'pdf_attachment' in values:
             for attachment in values['pdf_attachment']:
-                # Handling created attachments
                 if attachment[0] == 4:  # create
                     rec_id = attachment[1]
                     create_list_ids.append(rec_id)
-
-                # Handling removed attachments
                 elif attachment[0] == 3:  # unlink
                     rec_id = attachment[1]
                     unlink_list_ids.append(rec_id)
 
-            # Handle creation of new documents
             if create_list_ids:
                 attachments = self.env['ir.attachment'].browse(create_list_ids)
                 for rec in attachments:
                     _logger.info(f"Creating product document for attachment {rec.name} (ID: {rec.id})")
-                    create_doc.append({
+                    new_document = self.env['product.document'].sudo().create({
                         'res_model': 'product.template',
                         'name': rec.name,
                         'res_id': self.product_id.id,
                         'ir_attachment_id': rec.id,
                     })
+                    create_doc.append(new_document)
 
+                # Update the `product_document_id` for the related record
                 if create_doc:
-                    # Create product documents
-                    doc_res = self.env['product.document'].sudo().create(create_doc)
-                    _logger.info(f"Created {len(doc_res)} product documents for attachments")
+                    self.update({'product_document_id': create_doc[-1].id})
+                    _logger.info(f"Updated product_document_id to {create_doc[-1].id}")
 
-            # Handle unlinking of documents
             if unlink_list_ids:
                 docs_to_unlink = self.env['product.document'].sudo().search(
                     [('ir_attachment_id', 'in', unlink_list_ids)])
@@ -215,13 +245,12 @@ class CalendarEventProductLine(models.Model):
                     _logger.info(f"Unlinking {len(docs_to_unlink)} product documents")
                     docs_to_unlink.sudo().unlink()
 
-        # Recalculate visible users after the write operation
+        # Recalculate visible users
         self.calendar_id.compute_visible_users()
 
-        # Call the parent method to complete the write operation
+        # Call the parent write method
         res = super(CalendarEventProductLine, self).write(values)
 
-        # Optionally log the final result
         _logger.info(f"Write operation completed with result: {res}")
 
         return res
