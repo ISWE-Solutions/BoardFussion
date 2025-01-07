@@ -35,7 +35,6 @@ class CalendarEventProductLine(models.Model):
         'calendar_event_product_line_res_partner_rel',  # Unique relation table name
         string="Document visible to:",
         compute="_compute_restricted_attendees",
-        inverse="_inverse_restricted",
         store=True,
         readonly=False,
     )
@@ -46,6 +45,15 @@ class CalendarEventProductLine(models.Model):
     user_is_board_member_or_secretary = fields.Boolean(compute='_compute_user_is_board_member_or_secretary',
                                                        store=False)
     display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
+
+    @api.onchange('Restricted')
+    def _onchange_restricted(self):
+        """
+        Ensure changes to `Restricted` are reflected in `partner_ids` of the related `product.document`.
+        """
+        for record in self:
+            if record.product_document_id:
+                record.product_document_id.partner_ids = record.Restricted
 
     @api.onchange('confidential')
     def _onchange_confidential(self):

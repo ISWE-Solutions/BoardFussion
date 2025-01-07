@@ -24,6 +24,20 @@ class ProductDocument(models.Model):
     is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
     partner_ids = fields.Many2many('res.partner', string="Document visible to:")
 
+    @api.onchange('partner_ids')
+    def _onchange_partner_ids(self):
+        """
+        Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
+        """
+        if not self.partner_ids:
+            return
+
+        # Find related calendar event product lines
+        product_lines = self.env['calendar.event.product.line'].search([
+            ('product_document_id', '=', self.id)
+        ])
+        for line in product_lines:
+            line.Restricted = self.partner_ids
 
 
     #
