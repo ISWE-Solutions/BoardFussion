@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+    <record id="read_confidential_agenda_item_rule" model="ir.rule">
+        <field name="name">Read Confidential Agenda Items</field>
+        <field name="model_id" ref="model_calendar_event_product_line"/>
+        <field name="domain_force">
+            ['|', ('confidential', '=', False), ('create_uid', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')),
+                                 (4, ref('odoo_calendar_inheritence.group_agenda_meeting_board_member'))]"/>
+    </record>
     <record id="calendar_event_product_line_form_view" model="ir.ui.view">
         <field name="name">calendar.event.product.line.form.view</field>
         <field name="model">calendar.event.product.line</field>

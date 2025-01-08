@@ -107,6 +107,19 @@
             </field>
         </record>
 
+
+        <record id="custom_knowledge_article_view_form" model="ir.ui.view">
+            <field name="name">custom.knowledge.article.view.form</field>
+            <field name="model">knowledge.article</field>
+            <field name="inherit_id" ref="knowledge.knowledge_article_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//div[@class='row p-0 m-0'][contains(@style, 'min-height')]" position="attributes">
+                    <attribute name="style">min-height: 0</attribute>
+                </xpath>
+            </field>
+        </record>
+
+
         <record id="project.menu_projects" model="ir.ui.menu">
             <field name="name">Action Points</field>
         </record>

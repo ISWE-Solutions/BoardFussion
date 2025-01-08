@@ -46,6 +46,12 @@ class CalendarEventProductLine(models.Model):
                                                        store=False)
     display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
 
+    @api.model
+    def check_access(self):
+        if self.confidential and not self.env.user.has_group(
+                'odoo_calendar_inheritence.group_agenda_meeting_board_secretary'):
+            raise AccessError('You do not have access to this form.')
+
     @api.onchange('Restricted')
     def _onchange_restricted(self):
         """
@@ -92,7 +98,6 @@ class CalendarEventProductLine(models.Model):
         secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary').id
         self.user_is_board_member_or_secretary = (board_member_group in group_ids or secretary_group in group_ids)
 
-
     @api.depends('confidential', 'user_is_board_member_or_secretary', 'description')
     def _compute_display_description(self):
         for record in self:
@@ -100,17 +105,8 @@ class CalendarEventProductLine(models.Model):
                 record.display_description = 'Confidential'
             else:
                 record.display_description = html2plaintext(record.description or "")
-            # _logger.info("Computed display_description: %s", record.display_description)
 
-    # @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
-    # def _compute_restricted_attendees(self):
-    #     for record in self:
-    #         if record.calendar_id:
-    #             attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
-    #             _logger.info(f"Setting Restricted for record ID {record.id}: {attendees_and_creator.ids}")
-    #             record.Restricted = attendees_and_creator
-    #         elif record.product_document_id:
-    #             record.Restricted = record.product_document_id.partner_ids
+
 
     @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
     def _compute_restricted_attendees(self):
@@ -163,6 +159,7 @@ class CalendarEventProductLine(models.Model):
     def _compute_is_user_restricted(self):
         for record in self:
             record.is_user_restricted = self.env.user.partner_id not in record.Restricted
+
 
     document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
 

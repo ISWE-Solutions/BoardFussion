@@ -12,6 +12,7 @@ from PIL import Image, ImageFilter, ImageDraw, ImageFont
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
 from docx import Document
+import subprocess
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowable, ListItem
@@ -1698,8 +1699,12 @@ class OdooCalendarInheritence(models.Model):
             raise UserError(_("No associated article found to generate the cover page."))
 
         html_content = self.article_id.body
+        _logger.info("Original HTML Content: %s", html_content)
+
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         html_content = html_content.replace('/web/image', f'{base_url}/web/image')
+
+        _logger.info("Updated HTML Content with Base URL: %s", html_content)
 
         bootstrap_url = f'{base_url}/odoo_calendar_inheritence/static/src/bootstrap-5.1.3/css/bootstrap.min.css'
         bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
@@ -1721,9 +1726,9 @@ class OdooCalendarInheritence(models.Model):
         <body>
         """
         if company_logo_base64:
-            html_content_with_logo += f"""
+            html_content_with_logo += """
             <div style="text-align: center; margin-bottom: 20px;">
-                <img src="data:image/png;base64,{company_logo_base64}">
+                <img src="data:image/png;base64,[LOGO OMITTED]">
             </div>
             """
 
@@ -1747,29 +1752,38 @@ class OdooCalendarInheritence(models.Model):
 
     def _generate_cover_pdf(self, html_content_with_logo):
         """
-        Generate a PDF from the cover page HTML content.
+        Generate a PDF from the cover page HTML content using wkhtmltopdf.
         """
+        _logger.info("HTML Content before PDF Conversion: %s", html_content_with_logo)
+
         pdf_cover_stream = io.BytesIO()
         try:
-            options = {
-                'enable-local-file-access': None,
-                'quiet': '',
-                'encoding': 'UTF-8',
-                'disable-smart-shrinking': None,
-                'margin-top': '10mm',
-                'margin-bottom': '10mm',
-                'margin-left': '10mm',
-                'margin-right': '10mm',
-                'page-size': 'A4',
-            }
-            # Generate PDF
-            pdf_data = pdfkit.from_string(html_content_with_logo, False, options=options)
-            pdf_cover_stream.write(pdf_data)
+            # Create a temporary HTML file to pass to wkhtmltopdf
+            with open('/tmp/temp_cover_page.html', 'w', encoding='utf-8') as f:
+                f.write(html_content_with_logo)
+
+            # Run wkhtmltopdf command to convert the HTML to PDF
+            result = subprocess.run(
+                ['wkhtmltopdf', '/tmp/temp_cover_page.html', '/tmp/temp_cover_page.pdf'],
+                capture_output=True, text=True
+            )
+
+            # Check for errors in the wkhtmltopdf process
+            if result.returncode != 0:
+                _logger.error("wkhtmltopdf error: %s", result.stderr)
+                raise UserError(_("Failed to generate cover PDF: %s") % result.stderr)
+
+            # Read the generated PDF file into memory
+            with open('/tmp/temp_cover_page.pdf', 'rb') as pdf_file:
+                pdf_cover_stream.write(pdf_file.read())
+
             _logger.info("Cover page PDF generated successfully.")
+
         except Exception as e:
             _logger.error("Failed to generate cover PDF: %s", str(e))
             raise UserError(_("Failed to generate cover PDF: %s") % str(e))
 
+        # Rewind the stream to the beginning
         pdf_cover_stream.seek(0)
         return pdf_cover_stream
 
@@ -1844,33 +1858,6 @@ class OdooCalendarInheritence(models.Model):
         # Step 5: Determine user access level
         user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
                           self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-
-        # if user_has_access:
-        #     # Stream Confidential Document
-        #     confidential_document_url = "/web/content/%s" % saved_documents[
-        #         "Confidential"].id if saved_documents.get("Confidential") else ''
-        #     if confidential_document_url:
-        #         return {
-        #             'type': 'ir.actions.act_url',
-        #             'url': confidential_document_url,
-        #             'target': 'new',  # Opens the URL in a new tab
-        #         }
-        #     else:
-        #         _logger.warning("No Confidential document to preview.")
-        #         return {}
-        # else:
-        #     # Stream Non-Confidential Document
-        #     non_confidential_document_url = "/web/content/%s" % saved_documents[
-        #         "NonConfidential"].id if saved_documents.get("NonConfidential") else ''
-        #     if non_confidential_document_url:
-        #         return {
-        #             'type': 'ir.actions.act_url',
-        #             'url': non_confidential_document_url,
-        #             'target': 'new',  # Opens the URL in a new tab
-        #         }
-        #     else:
-        #         _logger.warning("No NonConfidential document to preview.")
-        #         return {}
 
         action = self.action_open_boardpack()
 
