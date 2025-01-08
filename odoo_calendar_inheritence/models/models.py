@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import base64
 import logging
 import io
-import re
+import os
 from io import BytesIO
 from markupsafe import Markup, escape
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
@@ -1758,23 +1758,31 @@ class OdooCalendarInheritence(models.Model):
 
         pdf_cover_stream = io.BytesIO()
         try:
-            # Create a temporary HTML file to pass to wkhtmltopdf
-            with open('/tmp/temp_cover_page.html', 'w', encoding='utf-8') as f:
+            # Create a temporary HTML file
+            temp_html_path = '/tmp/temp_cover_page.html'
+            temp_pdf_path = '/tmp/temp_cover_page.pdf'
+            with open(temp_html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content_with_logo)
 
-            # Run wkhtmltopdf command to convert the HTML to PDF
+            # Run wkhtmltopdf
             result = subprocess.run(
-                ['wkhtmltopdf', '/tmp/temp_cover_page.html', '/tmp/temp_cover_page.pdf'],
+                [
+                    'wkhtmltopdf',
+                    '--enable-local-file-access',
+                    '--load-error-handling', 'ignore',
+                    f'file://{temp_html_path}',
+                    temp_pdf_path
+                ],
                 capture_output=True, text=True
             )
 
-            # Check for errors in the wkhtmltopdf process
+            # Handle errors
             if result.returncode != 0:
                 _logger.error("wkhtmltopdf error: %s", result.stderr)
                 raise UserError(_("Failed to generate cover PDF: %s") % result.stderr)
 
             # Read the generated PDF file into memory
-            with open('/tmp/temp_cover_page.pdf', 'rb') as pdf_file:
+            with open(temp_pdf_path, 'rb') as pdf_file:
                 pdf_cover_stream.write(pdf_file.read())
 
             _logger.info("Cover page PDF generated successfully.")
@@ -1783,7 +1791,12 @@ class OdooCalendarInheritence(models.Model):
             _logger.error("Failed to generate cover PDF: %s", str(e))
             raise UserError(_("Failed to generate cover PDF: %s") % str(e))
 
-        # Rewind the stream to the beginning
+        finally:
+            # Cleanup temporary files
+            os.remove(temp_html_path)
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+
         pdf_cover_stream.seek(0)
         return pdf_cover_stream
 
