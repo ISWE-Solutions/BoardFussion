@@ -19,7 +19,8 @@
                         <group>
                             <!-- Description Field -->
                             <field name="description" widget="textarea" placeholder="Agenda Item"
-                                   class="larger-description"/>
+                                   class="larger-description" invisible="confidential, user_is_board_member_or_secretary"/>
+
                         </group>
                         <group>
                             <!-- Presenter and Add Attachments Fields -->

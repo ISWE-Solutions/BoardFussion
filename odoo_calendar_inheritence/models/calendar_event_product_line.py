@@ -46,6 +46,12 @@ class CalendarEventProductLine(models.Model):
                                                        store=False)
     display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
 
+    @api.onchange('product_line_ids')
+    def _onchange_product_line_ids(self):
+        for record in self:
+            if record.confidential and not record.user_is_board_member_or_secretary:
+                raise AccessError("You do not have the required permissions to edit this item.")
+
     @api.model
     def check_access(self):
         if self.confidential and not self.env.user.has_group(
@@ -106,8 +112,6 @@ class CalendarEventProductLine(models.Model):
             else:
                 record.display_description = html2plaintext(record.description or "")
 
-
-
     @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
     def _compute_restricted_attendees(self):
         for record in self:
@@ -135,7 +139,6 @@ class CalendarEventProductLine(models.Model):
             _logger.info(
                 f"After computing Restricted for record {record.id}: {record.Restricted.ids if record.Restricted else 'None'}")
 
-
     def _inverse_restricted(self):
         for record in self:
             if record.product_document_id:
@@ -143,7 +146,6 @@ class CalendarEventProductLine(models.Model):
                 _logger.info(f"Old partner_ids: {record.product_document_id.partner_ids.ids}")
                 record.product_document_id.partner_ids = record.Restricted
                 _logger.info(f"Updated partner_ids: {record.product_document_id.partner_ids.ids}")
-
 
     @api.depends('Restricted')
     def _inverse_restricted_attendees(self):
@@ -159,7 +161,6 @@ class CalendarEventProductLine(models.Model):
     def _compute_is_user_restricted(self):
         for record in self:
             record.is_user_restricted = self.env.user.partner_id not in record.Restricted
-
 
     document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
 

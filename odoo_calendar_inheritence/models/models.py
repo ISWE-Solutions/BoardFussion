@@ -1776,11 +1776,6 @@ class OdooCalendarInheritence(models.Model):
                 capture_output=True, text=True
             )
 
-            # Handle errors
-            if result.returncode != 0:
-                _logger.error("wkhtmltopdf error: %s", result.stderr)
-                raise UserError(_("Failed to generate cover PDF: %s") % result.stderr)
-
             # Read the generated PDF file into memory
             with open(temp_pdf_path, 'rb') as pdf_file:
                 pdf_cover_stream.write(pdf_file.read())
