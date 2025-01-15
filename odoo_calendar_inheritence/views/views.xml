@@ -85,6 +85,7 @@
 
             <xpath expr="//div[@name='button_box']" position="inside">
                 <field name="company_id" invisible="1"/>
+                <field name="is_board_park" invisible="1"/>
                 <field name="project_id"
                        invisible="1"
                 />
@@ -94,11 +95,15 @@
                     <field name="document_count" widget="statinfo" string="All Document"/>
                 </button>
 
-                <button class="oe_stat_button" type="object" invisible="not article_exists"
+                <button
+                        class="oe_stat_button"
+                        type="object"
                         name="action_open_boardpack"
-                        icon="fa-external-link" string="View Board Pack" confirm="Do you want to proceed ?">
-                </button>
-
+                        icon="fa-external-link"
+                        string="View Board Pack"
+                        confirm="Do you want to proceed ?"
+                        invisible="not is_board_park"
+                />
                 <button class="oe_stat_button" name="action_create_agenda_descriptions" type="object"
                         string="View minutes"
                         icon="fa-external-link" confirm="Do you want to proceed ?"
@@ -208,7 +213,7 @@
                         <button name="create_article_calendar" type="object" string="Build Agenda"
                                 class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
-                                confirm="Do you want to create board pack?"/>
+                                confirm="Do you want to Build Agenda?"/>
 
                         <button name="action_merge_documents" type="object" string="Board Pack"
                                 invisible="not article_exists"

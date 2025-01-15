@@ -24,90 +24,44 @@ class ProductDocument(models.Model):
     is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
     partner_ids = fields.Many2many('res.partner', string="Document visible to:")
 
-    @api.onchange('partner_ids')
-    def _onchange_partner_ids(self):
-        """
-        Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
-        """
-        if not self.partner_ids:
-            return
+    # @api.onchange('partner_ids')
+    # def _onchange_partner_ids(self):
+    #     """
+    #     Updates the Restricted field in related calendar.event.product.line records
+    #     when the partner_ids field changes.
+    #     """
+    #     _logger.info('onchange triggered for partner_ids in product.document (ID: %s)', self.id)
+    #
+    #     for document in self:
+    #         _logger.info('Partner IDs for document %s: %s', document.id, document.partner_ids.ids)
+    #
+    #         # Find all related calendar.event.product.line records
+    #         product_lines = self.env['calendar.event.product.line'].search([
+    #             ('product_document_id', '=', document.id)
+    #         ])
+    #         _logger.info('Found %d related product lines for document %s', len(product_lines), document.id)
+    #
+    #         for line in product_lines:
+    #             _logger.info('Updating Restricted field for product line ID: %s', line.id)
+    #             line.Restricted = [(6, 0, document.partner_ids.ids)]
+    #             _logger.info('Restricted field updated for product line ID: %s with partners: %s', line.id,
+    #                          document.partner_ids.ids)
+    #
+    # @api.onchange('partner_ids')
+    # def _onchange_partner_ids(self):
+    #     """
+    #     Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
+    #     """
+    #     if not self.partner_ids:
+    #         return
+    #
+    #     # Find related calendar event product lines
+    #     product_lines = self.env['calendar.event.product.line'].search([
+    #         ('product_document_id', '=', self.id)
+    #     ])
+    #     for line in product_lines:
+    #         line.Restricted = self.partner_ids
 
-        # Find related calendar event product lines
-        product_lines = self.env['calendar.event.product.line'].search([
-            ('product_document_id', '=', self.id)
-        ])
-        for line in product_lines:
-            line.Restricted = self.partner_ids
-
-
-    #
-    # def write(self, vals):
-    #     _logger.info(f"Writing to ProductDocument with IDs {self.ids}. Incoming vals: {vals}")
-    #
-    #     if self.env.context.get('prevent_recursion'):
-    #         _logger.warning("Preventing recursion in ProductDocument.write")
-    #         return super(ProductDocument, self).write(vals)
-    #
-    #     # Use a context flag to prevent recursion
-    #     context_with_flag = dict(self.env.context, prevent_recursion=True)
-    #
-    #     if 'partner_ids' in vals:
-    #         # Log current values before update
-    #         for document in self:
-    #             partner_names_before = document.partner_ids.mapped('name')
-    #             user_names_before = document.user_ids.mapped('name')
-    #             _logger.info(f"Before update, partner_ids for ProductDocument ID {document.id}: {partner_names_before}")
-    #             _logger.info(f"Before update, user_ids for ProductDocument ID {document.id}: {user_names_before}")
-    #
-    #     res = super(ProductDocument, self.with_context(context_with_flag)).write(vals)
-    #
-    #     if 'partner_ids' in vals:
-    #         for document in self:
-    #             partner_names_after = document.partner_ids.mapped('name')
-    #             _logger.info(f"After update, partner_ids for ProductDocument ID {document.id}: {partner_names_after}")
-    #
-    #             # Update and log related CalendarEventProductLine records
-    #             product_line_ids = self.env['calendar.event.product.line'].search(
-    #                 [('product_document_id', '=', document.id)]
-    #             )
-    #             _logger.info(f"Found related CalendarEventProductLine records: {product_line_ids.ids}")
-    #
-    #             for line in product_line_ids:
-    #                 restricted_before = line.Restricted.mapped('name')
-    #                 # Recompute Restricted field
-    #                 line._compute_restricted_attendees()
-    #                 restricted_after = line.Restricted.mapped('name')
-    #                 _logger.info(f"Restricted before for CalendarEventProductLine ID {line.id}: {restricted_before}")
-    #                 _logger.info(f"Restricted after for CalendarEventProductLine ID {line.id}: {restricted_after}")
-    #
-    #     return res
-    #
-    # @api.model
-    # def create(self, vals):
-    #     _logger.info(f"Creating a new ProductDocument. Incoming vals: {vals}")
-    #
-    #     res = super(ProductDocument, self).create(vals)
-    #
-    #     if 'partner_ids' in vals:
-    #         partner_names = res.partner_ids.mapped('name')
-    #         user_names = res.user_ids.mapped('name')
-    #         _logger.info(f"After creation, partner_ids for ProductDocument ID {res.id}: {partner_names}")
-    #         _logger.info(f"After creation, user_ids for ProductDocument ID {res.id}: {user_names}")
-    #
-    #         # Update and log related CalendarEventProductLine records
-    #         product_line_ids = self.env['calendar.event.product.line'].search(
-    #             [('product_document_id', '=', res.id)]
-    #         )
-    #         _logger.info(f"Found related CalendarEventProductLine records for new ProductDocument: {product_line_ids.ids}")
-    #
-    #         for line in product_line_ids:
-    #             restricted_before = line.Restricted.mapped('name')
-    #             line.Restricted = res.partner_ids
-    #             restricted_after = line.Restricted.mapped('name')
-    #             _logger.info(f"Restricted before for CalendarEventProductLine ID {line.id}: {restricted_before}")
-    #             _logger.info(f"Restricted after for CalendarEventProductLine ID {line.id}: {restricted_after}")
-    #
-    #     return res
 
     @api.depends('ir_attachment_id')
     def _compute_is_pdf_document(self):

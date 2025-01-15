@@ -107,6 +107,7 @@ class OdooCalendarInheritence(models.Model):
     is_meeting_finished = fields.Boolean(default=False)
     is_description_created = fields.Boolean(default=False)
     document_count = fields.Integer(compute='_compute_document_count')
+    is_board_park = fields.Boolean(string="Boardpack exists", default=False)
     agenda_ids = fields.One2many('agenda.lines', 'calendar_id', string='Agenda Items')
     # calendar_id = fields.Many2one('calendar.event.product.line', string="Calendar Event", required=True)
     Restricted = fields.Many2many(
@@ -1298,14 +1299,18 @@ class OdooCalendarInheritence(models.Model):
         }
 
     @api.onchange('partner_ids')
-    def compute_visible_users(self):
+    def compute_visible_users(self, product_document_ids=None):
         for record in self:
             if record.product_id and record.partner_ids:
-                record.product_id.product_document_ids.sudo().write(
-                    {
-                        'partner_ids': [(6, 0, record.partner_ids.ids)]
-                    }
-                )
+                # Determine which product documents to update
+                target_documents = product_document_ids or record.product_id.product_document_ids
+                # Prepare partner names and document names for logging
+                partner_names = ", ".join(record.partner_ids.mapped('name'))
+                # Perform the update
+                target_documents.sudo().write({
+                    'partner_ids': [(6, 0, record.partner_ids.ids)]
+                })
+
 
     def action_agenda_inv_sendmail(self):
         email = self.env.user.email
@@ -1866,7 +1871,7 @@ class OdooCalendarInheritence(models.Model):
         # Step 5: Determine user access level
         user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
                           self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-
+        self.is_board_park = True
         action = self.action_open_boardpack()
 
         # Explicitly return the action to propagate it

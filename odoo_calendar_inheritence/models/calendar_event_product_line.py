@@ -8,7 +8,8 @@ import logging
 from bs4 import BeautifulSoup
 from odoo.tools import html2plaintext
 
-_logger = logging.getLogger()  
+_logger = logging.getLogger()
+
 
 class CalendarEventProductLine(models.Model):
     _name = 'calendar.event.product.line'
@@ -16,13 +17,18 @@ class CalendarEventProductLine(models.Model):
     _order = 'sequence'
 
     sequence = fields.Integer(string='Sequence', default=10)
-    # calendar_id = fields.Many2one('calendar.event', string="Calendar Event")
     product_id = fields.Many2one('product.template', string="Product")
     product_document_id = fields.Many2one('product.document', string="Product Document")
     quantity = fields.Float(string="Quantity")
     uom_id = fields.Many2one('uom.uom', string="Unit of Measure")
     agenda = fields.Char(string='Agenda', default=_('new'))
-    presenter_id = fields.Many2many('res.users', string="Presenter", tracking=True)
+    presenter_id = fields.Many2many(
+        'res.partner',
+        'calendar_event_product_line_presenter_id_rel',
+        store=True,
+        tracking=True,
+    )
+
     duration = fields.Float(string="Duration")
     start_date = fields.Datetime(string='Start Date', default=lambda self: fields.Datetime.now())
     end_date = fields.Datetime(string='End Date')
@@ -30,21 +36,37 @@ class CalendarEventProductLine(models.Model):
     time = fields.Char(string='Time')
     pdf_attachment = fields.Many2many('ir.attachment', string='Add Attachments')
     calendar_id = fields.Many2one('calendar.event', string="Calendar Event", required=True)
+
     Restricted = fields.Many2many(
         'res.partner',
-        'calendar_event_product_line_res_partner_rel',  # Unique relation table name
-        string="Document visible to:",
-        compute="_compute_restricted_attendees",
+        'calendar_event_product_line_Restricted_rel',
+        string="Visible to:",
         store=True,
-        readonly=False,
     )
 
     is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
     confidential = fields.Boolean(string="Confidential", default=False)
 
+    document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
+
     user_is_board_member_or_secretary = fields.Boolean(compute='_compute_user_is_board_member_or_secretary',
                                                        store=False)
     display_description = fields.Char(string='Display Agenda Item', compute='_compute_display_description')
+    presenter_domain_ids = fields.Json(
+        string="Presenter Domain",
+        compute="_compute_presenter_domain_ids",
+        store=False,
+    )
+
+    @api.depends('calendar_id')
+    def _compute_presenter_domain_ids(self):
+        for record in self:
+            if record.calendar_id and record.calendar_id.partner_ids:
+                record.presenter_domain_ids = record.calendar_id.partner_ids.ids
+                # _logger.info(f"Computed presenter_domain_ids: {record.presenter_domain_ids}")
+            else:
+                record.presenter_domain_ids = []
+                # _logger.info("No calendar_id or no partner_ids found; presenter_domain_ids is empty.")
 
     @api.onchange('product_line_ids')
     def _onchange_product_line_ids(self):
@@ -112,57 +134,10 @@ class CalendarEventProductLine(models.Model):
             else:
                 record.display_description = html2plaintext(record.description or "")
 
-    @api.depends('calendar_id.partner_ids', 'calendar_id.create_uid.partner_id', 'product_document_id.partner_ids')
-    def _compute_restricted_attendees(self):
-        for record in self:
-            # Check if the context flag is set to avoid recursion
-            if self.env.context.get('prevent_restricted_update', False):
-                _logger.info(f"Skipping update of Restricted for record {record.id} due to recursion prevention flag.")
-                continue
-
-            _logger.info(
-                f"Before computing Restricted for record {record.id}: {record.Restricted.ids if record.Restricted else 'None'}")
-
-            # Begin setting Restricted with a context flag to prevent recursion
-            if record.product_document_id:
-                _logger.info(
-                    f"product_document_id exists. Setting Restricted to {record.product_document_id.partner_ids.ids}")
-                record.with_context(prevent_restricted_update=True).Restricted = record.product_document_id.partner_ids
-            elif record.calendar_id:
-                attendees_and_creator = record.calendar_id.partner_ids | record.calendar_id.create_uid.partner_id
-                _logger.info(
-                    f"calendar_id exists. Setting Restricted to combined partners: {attendees_and_creator.ids}")
-                record.with_context(prevent_restricted_update=True).Restricted = attendees_and_creator
-            else:
-                _logger.warning(f"Neither product_document_id nor calendar_id found for record {record.id}")
-
-            _logger.info(
-                f"After computing Restricted for record {record.id}: {record.Restricted.ids if record.Restricted else 'None'}")
-
-    def _inverse_restricted(self):
-        for record in self:
-            if record.product_document_id:
-                _logger.info(f"Before updating partner_ids in Product Document for record {record.id}")
-                _logger.info(f"Old partner_ids: {record.product_document_id.partner_ids.ids}")
-                record.product_document_id.partner_ids = record.Restricted
-                _logger.info(f"Updated partner_ids: {record.product_document_id.partner_ids.ids}")
-
-    @api.depends('Restricted')
-    def _inverse_restricted_attendees(self):
-        for line in self:
-            _logger.info(
-                f"Before updating partner_ids in ProductDocument (ID: {line.product_document_id.id}): {line.product_document_id.partner_ids.ids}")
-            if line.product_document_id:
-                line.product_document_id.partner_ids = line.Restricted
-                _logger.info(
-                    f"After updating partner_ids in ProductDocument (ID: {line.product_document_id.id}): {line.product_document_id.partner_ids.ids}")
-
     @api.depends('Restricted')
     def _compute_is_user_restricted(self):
         for record in self:
             record.is_user_restricted = self.env.user.partner_id not in record.Restricted
-
-    document_names = fields.Char(string="Document Names", compute="_compute_document_names", store=False)
 
     @api.depends('pdf_attachment')
     def _compute_document_names(self):
@@ -204,55 +179,75 @@ class CalendarEventProductLine(models.Model):
                     })
                     _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
+            # Handle Restricted and partner_ids synchronization on create
+            if 'product_document_id' in values and values.get('product_document_id'):
+                product_document = self.env['product.document'].browse(values['product_document_id'])
+                if product_document:
+                    _logger.info(
+                        f"Synchronizing partner_ids with product_document_id {product_document.id} on create")
+
+                    # Log partner_ids before update
+                    _logger.info(f"Before Update partner_ids: {values.get('partner_ids', [])}")
+
+                    # Update partner_ids with product_document's partner_ids
+                    values['partner_ids'] = product_document.partner_ids.ids
+
+                    # Log partner_ids after update
+                    _logger.info(f"After Update partner_ids: {values['partner_ids']}")
+
+                else:
+                    _logger.warning(
+                        f"No valid product_document found for product_document_id {values['product_document_id']}")
+
             # Recalculate visible users after document creation
-            record.calendar_id.compute_visible_users()
+            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
 
         return rtn
 
     def write(self, values):
-        if 'agenda' in values and values['agenda']:
-            self._check_unique_agenda(values['agenda'], self.id)
+        for record in self:
+            if 'agenda' in values and values['agenda']:
+                record._check_unique_agenda(values['agenda'], record.id)
 
-        create_doc = []
-        create_list_ids = []
-        unlink_doc = []
-        unlink_list_ids = []
+            create_doc = []
+            create_list_ids = []
+            unlink_list_ids = []
 
-        if 'pdf_attachment' in values:
-            for attachment in values['pdf_attachment']:
-                if attachment[0] == 4:  # create
-                    rec_id = attachment[1]
-                    create_list_ids.append(rec_id)
-                elif attachment[0] == 3:  # unlink
-                    rec_id = attachment[1]
-                    unlink_list_ids.append(rec_id)
+            if 'pdf_attachment' in values:
+                for attachment in values['pdf_attachment']:
+                    if attachment[0] == 4:  # create
+                        create_list_ids.append(attachment[1])
+                    elif attachment[0] == 3:  # unlink
+                        unlink_list_ids.append(attachment[1])
 
-            if create_list_ids:
-                attachments = self.env['ir.attachment'].browse(create_list_ids)
-                for rec in attachments:
-                    _logger.info(f"Creating product document for attachment {rec.name} (ID: {rec.id})")
-                    new_document = self.env['product.document'].sudo().create({
-                        'res_model': 'product.template',
-                        'name': rec.name,
-                        'res_id': self.product_id.id,
-                        'ir_attachment_id': rec.id,
-                    })
-                    create_doc.append(new_document)
+                if create_list_ids:
+                    attachments = self.env['ir.attachment'].browse(create_list_ids)
+                    for rec in attachments:
+                        _logger.info(f"Creating product document for attachment {rec.name} (ID: {rec.id})")
+                        new_document = self.env['product.document'].sudo().create({
+                            'res_model': 'product.template',
+                            'name': rec.name,
+                            'res_id': record.product_id.id,
+                            'ir_attachment_id': rec.id,
+                        })
+                        create_doc.append(new_document)
 
-                # Update the `product_document_id` for the related record
-                if create_doc:
-                    self.update({'product_document_id': create_doc[-1].id})
-                    _logger.info(f"Updated product_document_id to {create_doc[-1].id}")
+                    # Update the `product_document_id` for the related record
+                    if create_doc:
+                        record.update({'product_document_id': create_doc[-1].id})
+                        _logger.info(f"Updated product_document_id to {create_doc[-1].id}")
 
-            if unlink_list_ids:
-                docs_to_unlink = self.env['product.document'].sudo().search(
-                    [('ir_attachment_id', 'in', unlink_list_ids)])
-                if docs_to_unlink:
-                    _logger.info(f"Unlinking {len(docs_to_unlink)} product documents")
-                    docs_to_unlink.sudo().unlink()
+                if unlink_list_ids:
+                    docs_to_unlink = self.env['product.document'].sudo().search(
+                        [('ir_attachment_id', 'in', unlink_list_ids)])
+                    if docs_to_unlink:
+                        _logger.info(f"Unlinking {len(docs_to_unlink)} product documents")
+                        docs_to_unlink.sudo().unlink()
 
-        # Recalculate visible users
-        self.calendar_id.compute_visible_users()
+            # Recalculate visible users for the record
+            # record.calendar_id.compute_visible_users()
+            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
+            # record._compute_restricted_partner_ids()
 
         # Call the parent write method
         res = super(CalendarEventProductLine, self).write(values)
@@ -262,13 +257,14 @@ class CalendarEventProductLine(models.Model):
         return res
 
     def unlink(self):
-        unlink_list_ids=[]
+        unlink_list_ids = []
         for record in self:
             if record.pdf_attachment:
-                unlink_res = self.env['product.document'].sudo().search([('ir_attachment_id', 'in', record.pdf_attachment.ids)])
+                unlink_res = self.env['product.document'].sudo().search(
+                    [('ir_attachment_id', 'in', record.pdf_attachment.ids)])
                 if unlink_res:
                     unlink_res.sudo().unlink()
-        res = super(CalendarEventProductLine,self).unlink()
+        res = super(CalendarEventProductLine, self).unlink()
         return res
 
     def _create_subtask(self):
@@ -284,7 +280,7 @@ class CalendarEventProductLine(models.Model):
                 'project_id': project_id,
                 # 'parent_id': parent_task_id,
                 'description': line.description or '',
-                'user_ids':  [(6, 0, line.presenter_id.ids)],
+                'user_ids': [(6, 0, line.presenter_id.ids)],
                 'date_deadline': line.end_date,
             }
             project_task_model.create(task_vals)
@@ -292,7 +288,9 @@ class CalendarEventProductLine(models.Model):
     def action_create_html(self):
         active_id = self.product_id.product_document_ids.id
         company_id = self.env.company.id
-        html = Markup('<a href="/web?#active_id=%d&amp;action=qxm_product_pdf_annotation_tool.product_pdf_annotation&amp;cids=%d" style="padding: 5px 10px; color: #FFFFFF; text-decoration: none; background-color: #875A7B; border: 1px solid #875A7B; border-radius: 3px">View</a>') % (active_id, company_id)
+        html = Markup(
+            '<a href="/web?#active_id=%d&amp;action=qxm_product_pdf_annotation_tool.product_pdf_annotation&amp;cids=%d" style="padding: 5px 10px; color: #FFFFFF; text-decoration: none; background-color: #875A7B; border: 1px solid #875A7B; border-radius: 3px">View</a>') % (
+               active_id, company_id)
         vals = {'name': "PDF test", 'body': html}
         res = self.env['knowledge.article'].sudo().create(vals)
         # _logger.info(res)
