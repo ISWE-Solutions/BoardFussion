@@ -24,43 +24,40 @@ class ProductDocument(models.Model):
     is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
     partner_ids = fields.Many2many('res.partner', string="Document visible to:")
 
-    # @api.onchange('partner_ids')
-    # def _onchange_partner_ids(self):
-    #     """
-    #     Updates the Restricted field in related calendar.event.product.line records
-    #     when the partner_ids field changes.
-    #     """
-    #     _logger.info('onchange triggered for partner_ids in product.document (ID: %s)', self.id)
-    #
-    #     for document in self:
-    #         _logger.info('Partner IDs for document %s: %s', document.id, document.partner_ids.ids)
-    #
-    #         # Find all related calendar.event.product.line records
-    #         product_lines = self.env['calendar.event.product.line'].search([
-    #             ('product_document_id', '=', document.id)
-    #         ])
-    #         _logger.info('Found %d related product lines for document %s', len(product_lines), document.id)
-    #
-    #         for line in product_lines:
-    #             _logger.info('Updating Restricted field for product line ID: %s', line.id)
-    #             line.Restricted = [(6, 0, document.partner_ids.ids)]
-    #             _logger.info('Restricted field updated for product line ID: %s with partners: %s', line.id,
-    #                          document.partner_ids.ids)
-    #
-    # @api.onchange('partner_ids')
-    # def _onchange_partner_ids(self):
-    #     """
-    #     Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
-    #     """
-    #     if not self.partner_ids:
-    #         return
-    #
-    #     # Find related calendar event product lines
-    #     product_lines = self.env['calendar.event.product.line'].search([
-    #         ('product_document_id', '=', self.id)
-    #     ])
-    #     for line in product_lines:
-    #         line.Restricted = self.partner_ids
+    def _onchange_partner_ids(self):
+        """
+        Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
+        Avoid recursion by checking if an update is actually required.
+        """
+        _logger.info("Onchange triggered for partner_ids: %s", self.partner_ids)
+        if not self.partner_ids:
+            _logger.info("No partners selected, exiting onchange.")
+            return
+
+        # Find related calendar event product lines
+        product_lines = self.env["calendar.event.product.line"].search([
+            ("pdf_attachment", "in", self.ir_attachment_id.ids)
+        ])
+        _logger.info("Found product lines: %s", product_lines)
+
+        for line in product_lines:
+            if line.Restricted != self.partner_ids:
+                _logger.info("Updating Restricted for product line ID %s with partners: %s", line.id, self.partner_ids)
+                line.write({"Restricted": [(6, 0, self.partner_ids.ids)]})
+
+    def write(self, vals):
+        """
+        Override the write method to invoke `_onchange_partner_ids` when `partner_ids` is updated.
+        """
+        res = super(ProductDocument, self).write(vals)
+
+        if "partner_ids" in vals:
+            _logger.info("Partner_ids updated in write method for records: %s", self.ids)
+            # Call the onchange logic explicitly without recursion
+            self._onchange_partner_ids()
+
+        return res
+
 
 
     @api.depends('ir_attachment_id')

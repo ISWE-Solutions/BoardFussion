@@ -26,7 +26,6 @@ class CalendarEventProductLine(models.Model):
         'res.partner',
         'calendar_event_product_line_presenter_id_rel',
         store=True,
-        tracking=True,
     )
 
     duration = fields.Float(string="Duration")
@@ -169,90 +168,75 @@ class CalendarEventProductLine(models.Model):
             if record.pdf_attachment:
                 for attachment in record.pdf_attachment:
                     _logger.info(f"Processing attachment: {attachment.name}")
-
+                    restricted_partner_ids = list(set(record.Restricted.ids))
                     # Create new document for each attachment
                     new_document = document_model.sudo().create({
                         'res_model': 'product.template',
                         'name': attachment.name,
                         'res_id': product.id,
                         'ir_attachment_id': attachment.id,
+                        'partner_ids': [(6, 0, restricted_partner_ids)]
                     })
                     _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
             # Handle Restricted and partner_ids synchronization on create
-            if 'product_document_id' in values and values.get('product_document_id'):
-                product_document = self.env['product.document'].browse(values['product_document_id'])
-                if product_document:
-                    _logger.info(
-                        f"Synchronizing partner_ids with product_document_id {product_document.id} on create")
-
-                    # Log partner_ids before update
-                    _logger.info(f"Before Update partner_ids: {values.get('partner_ids', [])}")
-
-                    # Update partner_ids with product_document's partner_ids
-                    values['partner_ids'] = product_document.partner_ids.ids
-
-                    # Log partner_ids after update
-                    _logger.info(f"After Update partner_ids: {values['partner_ids']}")
-
-                else:
-                    _logger.warning(
-                        f"No valid product_document found for product_document_id {values['product_document_id']}")
 
             # Recalculate visible users after document creation
             record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
 
         return rtn
 
+    @api.model
     def write(self, values):
-        for record in self:
-            if 'agenda' in values and values['agenda']:
-                record._check_unique_agenda(values['agenda'], record.id)
-
-            create_doc = []
-            create_list_ids = []
-            unlink_list_ids = []
-
-            if 'pdf_attachment' in values:
-                for attachment in values['pdf_attachment']:
-                    if attachment[0] == 4:  # create
-                        create_list_ids.append(attachment[1])
-                    elif attachment[0] == 3:  # unlink
-                        unlink_list_ids.append(attachment[1])
-
-                if create_list_ids:
-                    attachments = self.env['ir.attachment'].browse(create_list_ids)
-                    for rec in attachments:
-                        _logger.info(f"Creating product document for attachment {rec.name} (ID: {rec.id})")
-                        new_document = self.env['product.document'].sudo().create({
-                            'res_model': 'product.template',
-                            'name': rec.name,
-                            'res_id': record.product_id.id,
-                            'ir_attachment_id': rec.id,
-                        })
-                        create_doc.append(new_document)
-
-                    # Update the `product_document_id` for the related record
-                    if create_doc:
-                        record.update({'product_document_id': create_doc[-1].id})
-                        _logger.info(f"Updated product_document_id to {create_doc[-1].id}")
-
-                if unlink_list_ids:
-                    docs_to_unlink = self.env['product.document'].sudo().search(
-                        [('ir_attachment_id', 'in', unlink_list_ids)])
-                    if docs_to_unlink:
-                        _logger.info(f"Unlinking {len(docs_to_unlink)} product documents")
-                        docs_to_unlink.sudo().unlink()
-
-            # Recalculate visible users for the record
-            # record.calendar_id.compute_visible_users()
-            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
-            # record._compute_restricted_partner_ids()
-
-        # Call the parent write method
         res = super(CalendarEventProductLine, self).write(values)
+        document_model = self.env['product.document']
 
-        _logger.info(f"Write operation completed with result: {res}")
+        for record in self:
+            # Update product_id if calendar_id changes
+            if 'calendar_id' in values:
+                record.product_id = record.calendar_id.product_id.id
+
+            product = record.product_id
+
+            # Ensure product_document_id is set
+            if 'product_document_id' not in values and not record.product_document_id:
+                new_document = document_model.sudo().create({
+                    'res_model': 'product.template',
+                    'name': product.display_name,
+                    'res_id': product.id,
+                })
+                record.product_document_id = new_document.id
+                _logger.info(
+                    f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {record.id}")
+
+            # Process PDF attachments
+            if 'pdf_attachment' in values:
+                existing_documents = document_model.sudo().search( [('ir_attachment_id', 'in', record.pdf_attachment.ids)])
+                attachment_ids = record.pdf_attachment.ids
+                for attachment in record.pdf_attachment:
+                    if not existing_documents.filtered(lambda doc: doc.ir_attachment_id.id == attachment.id):
+                        _logger.info(f"Processing new attachment: {attachment.name}")
+                        restricted_partner_ids = list(set(record.Restricted.ids))
+                        # Create new document for each attachment
+                        new_document = document_model.sudo().create({
+                            'res_model': 'product.template',
+                            'name': attachment.name,
+                            'res_id': product.id,
+                            'ir_attachment_id': attachment.id,
+                            'partner_ids': [(6, 0, restricted_partner_ids)]
+                        })
+                        _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
+
+            # Handle Restricted and partner_ids synchronization on update
+            if 'Restricted' in values:
+                restricted_partner_ids = list(set(record.Restricted.ids))
+                # Update partner_ids for related documents
+                for document in document_model.sudo().search([('ir_attachment_id', 'in', record.pdf_attachment.ids)]):
+                    document.partner_ids = [(6, 0, restricted_partner_ids)]
+                _logger.info(f"Updated partner_ids for product documents linked to product {product.id}")
+
+            # Recalculate visible users after updates
+            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
 
         return res
 
@@ -290,7 +274,7 @@ class CalendarEventProductLine(models.Model):
         company_id = self.env.company.id
         html = Markup(
             '<a href="/web?#active_id=%d&amp;action=qxm_product_pdf_annotation_tool.product_pdf_annotation&amp;cids=%d" style="padding: 5px 10px; color: #FFFFFF; text-decoration: none; background-color: #875A7B; border: 1px solid #875A7B; border-radius: 3px">View</a>') % (
-               active_id, company_id)
+                   active_id, company_id)
         vals = {'name': "PDF test", 'body': html}
         res = self.env['knowledge.article'].sudo().create(vals)
         # _logger.info(res)
