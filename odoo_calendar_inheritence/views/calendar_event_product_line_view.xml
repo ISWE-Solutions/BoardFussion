@@ -14,14 +14,15 @@
         <field name="model">calendar.event.product.line</field>
         <field name="arch" type="xml">
             <form string="Agenda Form" class="larger-wizard modal-xl">
-                <sheet>
+                <sheet invisible="not user_is_board_member_or_secretary, confidential">
                     <div class="o_group">
-                        <group>
+                        <group >
+                            <field name="confidential" invisible="1"/>
+                            <field name="user_is_board_member_or_secretary" invisible="1"/>
                             <!-- Description Field -->
                             <field name="description" widget="textarea" placeholder="Agenda Item"
-                                   class="larger-description"
+                                   class="larger-description" invisible="not user_is_board_member_or_secretary, confidential"
                             />
-
                         </group>
                         <group>
                             <field name="calendar_id" invisible="1"/>

@@ -110,6 +110,8 @@ class OdooCalendarInheritence(models.Model):
     is_board_park = fields.Boolean(string="Boardpack exists", default=False)
     agenda_ids = fields.One2many('agenda.lines', 'calendar_id', string='Agenda Items')
     # calendar_id = fields.Many2one('calendar.event.product.line', string="Calendar Event", required=True)
+    non_conf_cover_page = fields.Char(help="this field is used in tracking non confidential cover page",
+                                      string="Non confidential cover page")
     Restricted = fields.Many2many(
         'res.partner',
         'calendar_event_res_partner_rel',  # Unique relation table name
@@ -270,26 +272,41 @@ class OdooCalendarInheritence(models.Model):
         return "data:%s;base64,%s" % (Image.MIME[image.format], value.decode('ascii'))
 
     def delete_article(self):
-        """ Deletes the linked article if it exists. """
+        """ Deletes the linked article and its non-confidential copy if they exist. """
         if not self.article_id:
             raise ValidationError("No associated article found to delete!")
 
-        # Log the article name for debugging
         _logger.info("Deleting Article: %s", self.article_id.name)
 
         try:
-            # Unlink (delete) the article
+            # Use consistent naming for the non-confidential article
+            non_confidential_name = f"Non-Confidential Agenda: {self.name}"
+            _logger.info("Searching for Non-Confidential Article with name: %s", non_confidential_name)
+
+            # Search for the non-confidential article
+            non_confidential_article = self.env['knowledge.article'].sudo().search([
+                ('name', '=', non_confidential_name)
+            ], limit=1)
+
+            if non_confidential_article:
+                _logger.info("Deleting Non-Confidential Article: %s", non_confidential_article.name)
+                non_confidential_article.unlink()
+            else:
+                _logger.warning("Non-Confidential Article not found: %s", non_confidential_name)
+
+            # Delete the main article
             self.article_id.unlink()
 
-            # Clear the reference on the agenda record
+            # Clear references on the agenda record
             self.article_id = False
             self.last_write_count = 0
             self.last_write_date = fields.Datetime.now()
 
-            _logger.info("Article successfully deleted.")
+            _logger.info("Articles successfully deleted.")
+            self.is_board_park = False
         except Exception as e:
-            _logger.error("Error deleting article: %s", str(e))
-            raise ValidationError("An error occurred while deleting the article.")
+            _logger.error("Error deleting articles: %s", str(e))
+            raise ValidationError(f"An error occurred while deleting the articles: {str(e)}")
 
     def remove_attendees_from_article(self):
         """
@@ -351,153 +368,147 @@ class OdooCalendarInheritence(models.Model):
         if not self.product_line_ids:
             raise ValidationError("Please add an agenda before making an Article!")
 
-        counter = 1
         company_id = self.env.company
-        product_id = self.product_id.id
-        logo = company_id.logo
-        logo_html = (
-            Markup('<img src="%s" class="bg-view" alt="Company Logo"/>') % self._get_src_data_b64(logo)
-            if logo else ''
-        )
+        logo_html = f'<img src="/web/image/res.company/{company_id.id}/logo" class="bg-view" alt="Company Logo"/>' if company_id.logo else ''
 
-        # Build agenda table
-        html_content = Markup("""
-            <table class="table">
-                <thead>
-                    <tr style="border: 0px; background-color: #ffffff;">
-                        <th style="padding: 10px; border: 0px;">ID</th>
-                        <th style="padding: 10px; border: 0px;">Agenda Item</th>
-                        <th style="padding: 10px; border: 0px;">Presenter</th>
-                    </tr>
-                </thead>
-                <tbody id="article_body">
-        """)
-
-        for line in self.product_line_ids:
-            presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-            html_content += Markup("""
-                <tr style="border: 0px;">
+        def build_agenda_table(lines, is_confidential=False):
+            html_content = """
+                <table class="agenda-table table table-striped table-bordered">
+                      <thead class="table-light">
+                           <tr>
+                            <th>ID</th>
+                            <th>Agenda Item</th>
+                            <th>Presenter</th>
+                           </tr>
+                      </thead>
+                    <tbody id="article_body">
+            """
+            for counter, line in enumerate(lines, start=1):
+                presenters = ', '.join(presenter.name for presenter in line.presenter_id)
+                description = "Confidential" if is_confidential and line.confidential else (line.description or '')
+                html_content += f"""
+                   <tr style="border: 0px;">
                     <td style="padding: 10px; border: 0px;">{counter}</td>
-                    <td style="padding: 10px; border: 0px;">{description}</td>s
+                    <td style="padding: 10px; border: 0px;">{description}</td>
                     <td style="padding: 10px; border: 0px;">{presenters}</td>
-                </tr>
-            """).format(
-                counter=counter,
-                description=line.description or '',
-                presenters=presenters or ''
-            )
-            counter += 1
+                   </tr>
+                """
+            html_content += "</tbody></table>"
+            return html_content
 
-        html_content += Markup("</tbody></table>")
+        original_agenda = build_agenda_table(self.product_line_ids)
+        non_confidential_agenda = build_agenda_table(self.product_line_ids, is_confidential=True)
 
-        # Filter attendees by role
-        board_attendees = []
-        regular_attendees = []
-
-        for attendee in self.attendees_lines_ids:  # Assuming self.attendees_ids has attendee lines
-            if attendee.is_board_member or attendee.is_board_secretary:
-                board_attendees.append(attendee)
-            else:
-                regular_attendees.append(attendee)
-
-        # Generate Board Members Section
-        board_attendees_content = Markup("")
-        if board_attendees:
-            board_attendees_content += Markup("<div><h3>Board Members</h3>")
-            for attendee in board_attendees:
+        def format_attendees_section(title, attendees):
+            if not attendees:
+                return ""
+            section = f"""
+            <div>
+                <h3>{title}:</h3>
+                <ul class="list-group">
+            """
+            for attendee in attendees:
                 position = f" ({attendee.position})" if attendee.position else ""
-                board_attendees_content += Markup("<p>{attendee_name}   {position}</p>").format(
-                    attendee_name=attendee.attendee_name, position=position
-                )
-            board_attendees_content += Markup("</div><hr/>")
+                section += f"<li  class='list-group-item'>{attendee.attendee_name}{position}</li>"
+            section += "</ul><hr/></div>"
+            return section
 
-        # Generate Regular Attendees Section
-        regular_attendees_content = Markup("")
-        if regular_attendees:
-            regular_attendees_content += Markup("<div><h3>Other Attendees</h3>")
-            for attendee in regular_attendees:
-                position = f" ({attendee.position})" if attendee.position else ""
-                regular_attendees_content += Markup("<p>{attendee_name}   {position}</p>").format(
-                    attendee_name=attendee.attendee_name, position=position
-                )
-            regular_attendees_content += Markup("</div><hr/>")
+        board_attendees = [attendee for attendee in self.attendees_lines_ids if
+                           attendee.is_board_member or attendee.is_board_secretary]
+        regular_attendees = [attendee for attendee in self.attendees_lines_ids if attendee not in board_attendees]
 
-        # Add description section
-        description_content = Markup("")
-        if self.description:
-            description_content += Markup("""
-                <div>
-                    <h3>Description</h3>
-                    <p>{description}</p>
-                    <hr/>
-                </div>
-            """).format(description=self.description)
+        shared_vars = {
+            "logo_html": logo_html,
+            "company_name": company_id.name,
+            "company_street": company_id.street or '',
+            "company_city": company_id.city or '',
+            "company_country": company_id.country_id.name or '',
+            "company_phone": company_id.phone or '',
+            "company_email": company_id.email or '',
+            "company_website": company_id.website or '',
+            "event_name": self.name,
+            "start_date": self.start_date or '',
+            "organizer": self.user_id.name or '',
+        }
 
-        # Build article body
-        body_content = Markup("""
+        description_content = f"""
+            <div>
+                <h3>Description</h3>
+                <p>{Markup.escape(self.description)}</p>
+                <hr/>
+            </div>
+        """ if self.description else ""
+
+        base_content = """
             <div>
                 <header style="text-align: center;">
                     {logo_html}<br><br>
                     <h2><strong>{company_name}</strong></h2>
                 </header>
                 <div class="container">
-                    <div class="card-body border-dark">
-                        <div class="row no-gutters align-items-center">
-                            <div class="col align-items-center">
-                                <p class="mb-0"><span>{company_street}</span></p>
-                                <p class="mb-0"><span>{company_city}</span></p>
-                                <p class="m-0"><span>{company_country}</span></p>
-                            </div>
-                            <div class="col-auto">
-                                <div class="float-right text-end">
-                                    <p class="mb-0 float-right"><span>{company_phone}</span></p>
-                                    <p class="mb-0 float-right"><span>{company_email}</span></p>
-                                    <p class="mb-0 float-right"><span>{company_website}</span></p>
-                                </div>
+                <div class="card-body border-dark">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col align-items-center">
+                            <p class="mb-0"><span>{company_street}</span></p>
+                            <p class="mb-0"><span>{company_city}</span></p>
+                            <p class="m-0"><span>{company_country}</span></p>
+                        </div>
+                        <div class="col-auto">
+                            <div class="float-right text-end">
+                                <p class="mb-0 float-right"><span>{company_phone}</span></p>
+                                <p class="mb-0 float-right"><span>{company_email}</span></p>
+                                <p class="mb-0 float-right"><span>{company_website}</span></p>
                             </div>
                         </div>
                     </div>
+                  </div>
                 </div><br><hr>
                 <div class="container">
-                    <p><strong>Title: </strong> {event_name}</p>
+                    <p><strong>Title:</strong> {event_name}</p>
                     <p><strong>Start Date:</strong> {start_date}</p>
                     <p><strong>Organizer:</strong> {organizer}</p>
+                    <hr/>
+                    {description_content}
+                    {board_attendees_content}
+                    {regular_attendees_content}
+                    <h3>Agenda</h3>
+                    {agenda_content}
                 </div>
-                <hr/>
-                {description_content}
-                <h3>Agenda</h3>
-                {html_content}
             </div>
-        """).format(
-            logo_html=logo_html,
-            company_name=company_id.name,
-            company_street=company_id.street,
-            company_city=company_id.city,
-            company_country=company_id.country_id.name,
-            company_phone=company_id.phone,
-            company_email=company_id.email,
-            company_website=company_id.website,
-            event_name=self.name,
-            start_date=self.start_date if self.start_date else ' ',
-            organizer=self.user_id.name,
+        """
+
+        board_attendees_content = format_attendees_section("TO", board_attendees)
+        regular_attendees_content = format_attendees_section("CC", regular_attendees)
+
+        original_body = base_content.format(
             description_content=description_content,
             board_attendees_content=board_attendees_content,
             regular_attendees_content=regular_attendees_content,
-            html_content=html_content
+            agenda_content=original_agenda,
+            **shared_vars
         )
-
-        # Create or update the article
-        article_values = {
-            'name': Markup("Agenda: {event_name}").format(event_name=self.name),
-            'body': body_content,
+        article = self.env['knowledge.article'].sudo().create({
+            'name': f"Agenda: {self.name}",
+            'body': original_body,
             'calendar_id': self.id,
-        }
-
-        article = self.env['knowledge.article'].sudo().create(article_values)
+        })
         self.article_id = article.id
-        self.article_id.product_id = self.product_id.id
-        self.last_write_count = len(self.product_line_ids)
-        self.last_write_date = fields.Datetime.now()
+
+        non_confidential_body = base_content.format(
+            description_content=description_content,
+            board_attendees_content=board_attendees_content,
+            regular_attendees_content=regular_attendees_content,
+            agenda_content=non_confidential_agenda,
+            **shared_vars
+        )
+        non_conf_cp = self.env['knowledge.article'].sudo().create({
+            'name': f"Non-Confidential Agenda: {self.name}",
+            'body': non_confidential_body,
+            'calendar_id': self.id,
+            'non_conf_cover_page': f"{article.id}-Non"
+        })
+
+        self.non_conf_cover_page = f"{article.id}-Non"
 
     def update_attendees_in_article(self):
         """
@@ -513,7 +524,7 @@ class OdooCalendarInheritence(models.Model):
             board_attendees = []
             regular_attendees = []
 
-            for attendee in self.attendees_lines_ids:
+            for attendee in self.partner_ids:
                 if attendee.is_board_member or attendee.is_board_secretary:
                     board_attendees.append(attendee)
                 else:
@@ -1311,7 +1322,6 @@ class OdooCalendarInheritence(models.Model):
                     'partner_ids': [(6, 0, record.partner_ids.ids)]
                 })
 
-
     def action_agenda_inv_sendmail(self):
         email = self.env.user.email
         if email:
@@ -1559,7 +1569,7 @@ class OdooCalendarInheritence(models.Model):
 
         # Correct invitee logic
         if is_confidential:
-            partners_to_add =invitees.ids
+            partners_to_add = invitees.ids
             _logger.info("Adding board members and secretaries as partners for confidential file.")
         else:
             partners_to_add = board_partners.ids
@@ -1695,63 +1705,61 @@ class OdooCalendarInheritence(models.Model):
         merged_stream.seek(0)
         return merged_stream
 
-    def _generate_cover_html(self, company_logo_base64):
+    def _generate_cover_html(self, company_logo_base64, article_body):
         """
         Generate HTML content for the cover page, including the company logo.
         Add CSS for page breaks to ensure proper content flow in the PDF.
         """
-        if not self.article_id or not self.article_id.body:
-            raise UserError(_("No associated article found to generate the cover page."))
+        if not article_body:
+            raise UserError(_("No article body found to generate the cover page."))
 
-        html_content = self.article_id.body
+        html_content = article_body
         _logger.info("Original HTML Content: %s", html_content)
 
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         html_content = html_content.replace('/web/image', f'{base_url}/web/image')
 
-        _logger.info("Updated HTML Content with Base URL: %s", html_content)
-
         bootstrap_url = f'{base_url}/odoo_calendar_inheritence/static/src/bootstrap-5.1.3/css/bootstrap.min.css'
         bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
 
         html_content_with_logo = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            {bootstrap_css}
-            <style>
-                .page-break {{ 
-                    page-break-before: always; 
-                    margin-top: 10mm;
-                }}
-            </style>
-        </head>
-        <body>
-        """
+           <!DOCTYPE html>
+           <html lang="en">
+           <head>
+               <meta charset="UTF-8">
+               <meta name="viewport" content="width=device-width, initial-scale=1.0">
+               {bootstrap_css}
+               <style>
+                   .page-break {{ 
+                       page-break-before: always; 
+                       margin-top: 10mm;
+                   }}
+               </style>
+           </head>
+           <body>
+           """
         if company_logo_base64:
             html_content_with_logo += """
-            <div style="text-align: center; margin-bottom: 20px;">
-                <img src="data:image/png;base64,[LOGO OMITTED]">
-            </div>
-            """
+               <div style="text-align: center; margin-bottom: 20px;">
+                   <img src="data:image/png;base64,[LOGO OMITTED]">
+               </div>
+               """
 
-        # Split content and add page breaks
+        # Add content and page breaks
         html_content_with_logo += f"""
-        <div>
-            <div class="content-section">
-                {html_content}
-            </div>
-            <div class="page-break"></div>
-            <div class="content-section">
-                <h3>Additional Content</h3>
-                <p>Include more details here.</p>
-            </div>
-        </div>
-        </body>
-        </html>
-        """
+           <div>
+               <div class="content-section">
+                   {html_content}
+               </div>
+               <div class="page-break"></div>
+               <div class="content-section">
+                   <h3>Additional Content</h3>
+                   <p>Include more details here.</p>
+               </div>
+           </div>
+           </body>
+           </html>
+           """
 
         return html_content_with_logo
 
@@ -1774,6 +1782,11 @@ class OdooCalendarInheritence(models.Model):
                 [
                     'wkhtmltopdf',
                     '--enable-local-file-access',
+                    '--margin-top', '10mm',
+                    '--margin-bottom', '10mm',
+                    '--margin-left', '10mm',
+                    '--margin-right', '10mm',
+                    '--page-size', 'A4',
                     '--load-error-handling', 'ignore',
                     f'file://{temp_html_path}',
                     temp_pdf_path
@@ -1820,16 +1833,27 @@ class OdooCalendarInheritence(models.Model):
 
         # Step 1: Fetch the company logo and generate cover page
         company_logo_base64 = self._get_company_logo_base64()
-        html_content_with_logo = self._generate_cover_html(company_logo_base64)
+        confidential_article_body = self.article_id.body if self.article_id else None
 
-        # Generate the cover page PDF
-        pdf_cover_stream = self._generate_cover_pdf(html_content_with_logo)
+        # Use the shared non_conf_cover_page field to fetch the article body
+        non_conf_article = self.env['knowledge.article'].search([('non_conf_cover_page', '=', self.non_conf_cover_page)], limit=1)
+        non_conf_article_body = non_conf_article.body if non_conf_article else None
 
-        # Step 2: Classify attachments into confidential and non-confidential
+        if not confidential_article_body:
+            raise UserError(_("No article found for confidential cover page."))
+        if not non_conf_article_body:
+            raise UserError(_("No article found for non-confidential cover page."))
+
+        # Generate HTML for both covers
+        confidential_html = self._generate_cover_html(company_logo_base64, confidential_article_body)
+        non_confidential_html = self._generate_cover_html(company_logo_base64, non_conf_article_body)
+
+        # Generate PDFs for both covers
+        confidential_pdf_stream = self._generate_cover_pdf(confidential_html)
+        non_confidential_pdf_stream = self._generate_cover_pdf(non_confidential_html)
+
+        # Step 3: Classify attachments
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
-
-        _logger.info("Confidential Attachments: %d", len(confidential_attachments))
-        _logger.info("Non-Confidential Attachments: %d", len(non_confidential_attachments))
 
         if not confidential_attachments and not non_confidential_attachments:
             _logger.warning("No attachments found to merge.")
@@ -1838,12 +1862,12 @@ class OdooCalendarInheritence(models.Model):
         # Step 3: Generate streams
         # For Confidential: Merge cover page with all attachments
         confidential_stream = self._merge_attachments(
-            pdf_cover_stream, confidential_attachments + non_confidential_attachments, restricted=True
+            confidential_pdf_stream, confidential_attachments + non_confidential_attachments, restricted=True
         )
 
         # For Non-Confidential: Merge cover page with only non-confidential attachments
         non_confidential_stream = self._merge_attachments(
-            pdf_cover_stream, non_confidential_attachments, restricted=False
+            non_confidential_pdf_stream, non_confidential_attachments, restricted=False
         )
 
         # Step 4: Save the documents

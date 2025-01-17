@@ -15,6 +15,10 @@ class KnowledgeArticle(models.Model):
         'calendar.event', 'article_id', string="Product Lines"
     )
 
+    non_conf_cover_page = fields.Char(help="this field is used in tracking non confidential cover page",
+                                      string="Non confidential cover page")
+
+
     def action_open_documents(self):
         # self.ensure_one()
         current_time = fields.Datetime.now()
@@ -82,19 +86,3 @@ class KnowledgeArticle(models.Model):
             'res_model': 'some.model',
             'target': 'new',
         }
-
-    # @api.model
-    # def create_article_with_attachments(self, name, attachment_ids):
-    #     if not attachment_ids:
-    #         raise UserError("No attachments provided.")
-    #
-    #     # Create a new Knowledge article
-    #     article = self.create({'name': name})
-    #
-    #     # Attach documents to the newly created article
-    #     for attachment in self.env['ir.attachment'].browse(attachment_ids):
-    #         attachment.copy({
-    #             'res_model': 'knowledge.article',
-    #             'res_id': article.id,
-    #         })
-    #     return article
