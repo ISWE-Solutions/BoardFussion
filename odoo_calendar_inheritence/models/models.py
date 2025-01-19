@@ -1,3 +1,5 @@
+from email.policy import default
+
 from PyPDF2 import PdfReader, PdfWriter
 import re
 from markupsafe import Markup
@@ -20,7 +22,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from xml.sax.saxutils import escape
 from weasyprint import HTML
-import pdfkit
+import subprocess
+import tempfile
+
 
 _logger = logging.getLogger(__name__)
 
@@ -112,6 +116,8 @@ class OdooCalendarInheritence(models.Model):
     # calendar_id = fields.Many2one('calendar.event.product.line', string="Calendar Event", required=True)
     non_conf_cover_page = fields.Char(help="this field is used in tracking non confidential cover page",
                                       string="Non confidential cover page")
+
+    bp_from = fields.Char(help="From field on Boardpark", default="Acting Board Secretary and Legal Counsel")
     Restricted = fields.Many2many(
         'res.partner',
         'calendar_event_res_partner_rel',  # Unique relation table name
@@ -373,25 +379,27 @@ class OdooCalendarInheritence(models.Model):
 
         def build_agenda_table(lines, is_confidential=False):
             html_content = """
-                <table class="agenda-table table table-striped table-bordered">
-                      <thead class="table-light">
-                           <tr>
-                            <th>ID</th>
-                            <th>Agenda Item</th>
-                            <th>Presenter</th>
-                           </tr>
-                      </thead>
-                    <tbody id="article_body">
+                <table class="agenda-table table" style="width: 100%; table-layout: fixed; border: none; border-collapse: collapse;">
+                    <colgroup style="border:none;">
+                        <col style="width: 10%;" /> <!-- First column: 10% -->
+                        <col style="width: 90%;" /> <!-- Second column: 90% -->
+                    </colgroup>
+                    <thead class="" display="none">
+                        <tr>
+                            <th style="padding: 10px; text-align: center; border: none;"></th>
+                            <th style="padding: 10px; text-align: center; border: none;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="article_body" style="border:none;">
             """
             for counter, line in enumerate(lines, start=1):
                 presenters = ', '.join(presenter.name for presenter in line.presenter_id)
                 description = "Confidential" if is_confidential and line.confidential else (line.description or '')
                 html_content += f"""
-                   <tr style="border: 0px;">
-                    <td style="padding: 10px; border: 0px;">{counter}</td>
-                    <td style="padding: 10px; border: 0px;">{description}</td>
-                    <td style="padding: 10px; border: 0px;">{presenters}</td>
-                   </tr>
+                    <tr style="border: none;">
+                        <td style="padding: 10px; border: none; text-align: center;">{counter}</td>
+                        <td style="padding: 10px; border: none; text-align: justify;" class="text-justify">{description}</td>
+                    </tr>
                 """
             html_content += "</tbody></table>"
             return html_content
@@ -403,19 +411,51 @@ class OdooCalendarInheritence(models.Model):
             if not attendees:
                 return ""
             section = f"""
-            <div>
-                <h3>{title}:</h3>
-                <ul class="list-group">
+            <div class="table-responsive my-3">
+                <table class="table" style="table-layout: fixed; width: 100%; border: none; border-collapse: collapse;">
+                    <colgroup>
+                        <col style="width: 10%;" /> <!-- Title column -->
+                        <col style="width: 5%;" />  <!-- Colon column -->
+                        <col style="width: 85%;" /> <!-- Attendees column -->
+                    </colgroup>
+                    <thead class="" style="display:none;">
+                        <tr style="border: none;">
+                            <th style="border: none;"></th>
+                            <th style="text-align: center; border: none;"></th>
+                            <th style="border: none;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border: none;">
+                            <td rowspan="{len(attendees)}" class="fw-bold" style="border: none;">{title}</td>
+                            <td rowspan="{len(attendees)}" class="text-center" style="border: none;">:</td>
+                            <td style="border: none;">{attendees[0].name} <span class="text-muted">({attendees[0].function})</span></td>
+                        </tr>
             """
-            for attendee in attendees:
-                position = f" ({attendee.position})" if attendee.position else ""
-                section += f"<li  class='list-group-item'>{attendee.attendee_name}{position}</li>"
-            section += "</ul><hr/></div>"
+            for attendee in attendees[1:]:
+                section += f"""
+                        <tr style="border: none;">
+                            <td style="border: none;">{attendee.name} <span class="text-muted">({attendee.function})</span></td>
+                        </tr>
+                """
+            section += """
+                    </tbody>
+                </table>
+            </div>
+            """
             return section
 
-        board_attendees = [attendee for attendee in self.attendees_lines_ids if
-                           attendee.is_board_member or attendee.is_board_secretary]
-        regular_attendees = [attendee for attendee in self.attendees_lines_ids if attendee not in board_attendees]
+        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
+                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+
+        # Step 2: Separate attendees into board attendees and regular attendees
+        board_attendees = [attendee for attendee in self.partner_ids if attendee.user_ids and any(
+            user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or
+            user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+            for user in attendee.user_ids
+        )]
+
+        regular_attendees = [attendee for attendee in self.partner_ids if attendee not in board_attendees]
 
         shared_vars = {
             "logo_html": logo_html,
@@ -445,34 +485,40 @@ class OdooCalendarInheritence(models.Model):
                     {logo_html}<br><br>
                     <h2><strong>{company_name}</strong></h2>
                 </header>
-                <div class="container">
+            <div class="container">
                 <div class="card-body border-dark">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col align-items-center">
-                            <p class="mb-0"><span>{company_street}</span></p>
-                            <p class="mb-0"><span>{company_city}</span></p>
-                            <p class="m-0"><span>{company_country}</span></p>
-                        </div>
-                        <div class="col-auto">
-                            <div class="float-right text-end">
-                                <p class="mb-0 float-right"><span>{company_phone}</span></p>
-                                <p class="mb-0 float-right"><span>{company_email}</span></p>
-                                <p class="mb-0 float-right"><span>{company_website}</span></p>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-                </div><br><hr>
+                    <table style="width: 100%; table-layout: fixed; border-collapse: collapse; border: none;">
+                        <tr style="border: none;">
+                            <!-- Left Column -->
+                            <td style="text-align: left; vertical-align: top; border: none; padding: 0;">
+                                <p class="mb-0"><span>{company_street}</span></p>
+                                <p class="mb-0"><span>{company_city}</span></p>
+                                <p class="mb-0"><span>{company_country}</span></p>
+                            </td>
+                            <!-- Right Column -->
+                            <td style="text-align: right; vertical-align: top; border: none; padding: 0;">
+                                <p class="mb-0"><span>{company_phone}</span></p>
+                                <p class="mb-0"><span>{company_email}</span></p>
+                                <p class="mb-0"><span>{company_website}</span></p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+                <br>
+                <br>
+                   <h3> Confidential </h3>
+                <br>
                 <div class="container">
-                    <p><strong>Title:</strong> {event_name}</p>
-                    <p><strong>Start Date:</strong> {start_date}</p>
-                    <p><strong>Organizer:</strong> {organizer}</p>
-                    <hr/>
                     {description_content}
                     {board_attendees_content}
                     {regular_attendees_content}
-                    <h3>Agenda</h3>
+                    <hr/>
+                    <p><strong> FROM:</strong></p>
+                    <p><strong>DATE:</strong>{start_date}</p>
+                    <p><strong>SUBJECT:</strong> {event_name}</p>
                     {agenda_content}
+                    <p><strong></strong> {organizer}</p>
                 </div>
             </div>
         """
@@ -481,6 +527,7 @@ class OdooCalendarInheritence(models.Model):
         regular_attendees_content = format_attendees_section("CC", regular_attendees)
 
         original_body = base_content.format(
+            confidential_header="<h3 style='color: red; text-transform: uppercase;'>CONFIDENTIAL</h3>",
             description_content=description_content,
             board_attendees_content=board_attendees_content,
             regular_attendees_content=regular_attendees_content,
@@ -495,6 +542,7 @@ class OdooCalendarInheritence(models.Model):
         self.article_id = article.id
 
         non_confidential_body = base_content.format(
+            confidential_header="",
             description_content=description_content,
             board_attendees_content=board_attendees_content,
             regular_attendees_content=regular_attendees_content,
@@ -605,7 +653,7 @@ class OdooCalendarInheritence(models.Model):
             # Construct the HTML table
             html_content = Markup("""
                 <table class="table">
-                    <thead>
+                    <thead style="display:none">
                         <tr style="border: 0px; background-color: #ffffff;">
                             <th style="padding: 10px; border: 0px;">ID</th>
                             <th style="padding: 10px; border: 0px;">Agenda Item</th>
@@ -619,7 +667,7 @@ class OdooCalendarInheritence(models.Model):
             for line in self.product_line_ids:
                 presenters = ', '.join(presenter.name for presenter in line.presenter_id)
                 html_content += Markup("""
-                    <tr style="border: 0px;">
+                    <tr style="border: none;">
                         <td style="padding: 10px; border: 0px;">{counter}</td>
                         <td style="padding: 10px; border: 0px;">{description}</td>
                         <td style="padding: 10px; border: 0px;">{presenters}</td>
@@ -1675,46 +1723,53 @@ class OdooCalendarInheritence(models.Model):
 
         return confidential_attachments, non_confidential_attachments
 
-    def _merge_attachments(self, cover_stream, attachments, restricted=True):
+    def _merge_attachments(self, cover_file_path, attachments):
         """
-        Merge cover stream with provided attachments.
-        For restricted users, apply a watermark to all pages of the attachments.
+        Merge the cover file (from disk) with provided attachments.
         """
+        from PyPDF2 import PdfWriter, PdfReader
+        from io import BytesIO
+        import base64
+
         self.ensure_one()
-        merged_stream = io.BytesIO()
+        merged_stream = BytesIO()  # Initialize in-memory buffer for the final merged PDF
         pdf_writer = PdfWriter()
+        pdf_writer.compress_content = False  # Ensure no compression is applied
 
-        # Add the cover page without watermark
-        cover_reader = PdfReader(cover_stream)
-        pdf_writer.add_page(cover_reader.pages[0])
-
-        # Check if the user is restricted
-        is_restricted_user = restricted and self.env.user.partner_id not in self.Restricted
-
-        # Add attachments with or without watermark
-        for attachment in attachments:
-            attachment_reader = PdfReader(io.BytesIO(base64.b64decode(attachment.datas)))
-            for page in attachment_reader.pages:
-                if is_restricted_user:
-                    # Apply watermark to the page for restricted users
-                    page = self._add_watermark_to_page(page)
+        # Add all pages of the cover file
+        try:
+            cover_reader = PdfReader(cover_file_path)
+            for page in cover_reader.pages:
                 pdf_writer.add_page(page)
+        except Exception as e:
+            _logger.error(f"Error reading cover file at {cover_file_path}: {e}")
+            raise UserError(_("Failed to read the cover file: %s") % cover_file_path)
 
-        # Write the final merged PDF
+        # Process and add attachments
+        for attachment in attachments:
+            try:
+                attachment_data = base64.b64decode(attachment.datas)
+                attachment_reader = PdfReader(BytesIO(attachment_data))
+
+                for page in attachment_reader.pages:
+                    pdf_writer.add_page(page)
+            except Exception as e:
+                _logger.error(f"Error processing attachment: {e}")
+                raise UserError(_("Failed to process an attachment."))
+
+        # Write the final merged PDF to the in-memory buffer
         pdf_writer.write(merged_stream)
         merged_stream.seek(0)
         return merged_stream
 
-    def _generate_cover_html(self, company_logo_base64, article_body):
+    def _generate_cover_html(self, company_logo_base64, article_body, is_confidential=True):
         """
-        Generate HTML content for the cover page, including the company logo.
-        Add CSS for page breaks to ensure proper content flow in the PDF.
+        Generate HTML content for the cover page, save as both HTML and PDF.
         """
         if not article_body:
             raise UserError(_("No article body found to generate the cover page."))
 
         html_content = article_body
-        _logger.info("Original HTML Content: %s", html_content)
 
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
         html_content = html_content.replace('/web/image', f'{base_url}/web/image')
@@ -1723,95 +1778,74 @@ class OdooCalendarInheritence(models.Model):
         bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
 
         html_content_with_logo = f"""
-           <!DOCTYPE html>
-           <html lang="en">
-           <head>
-               <meta charset="UTF-8">
-               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-               {bootstrap_css}
-               <style>
-                   .page-break {{ 
-                       page-break-before: always; 
-                       margin-top: 10mm;
-                   }}
-               </style>
-           </head>
-           <body>
-           """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                {bootstrap_css}
+                <style>
+                    .page-break {{ 
+                        page-break-before: always; 
+                        margin-top: 10mm;
+                    }}
+                </style>
+            </head>
+            <body>
+        """
         if company_logo_base64:
             html_content_with_logo += """
-               <div style="text-align: center; margin-bottom: 20px;">
-                   <img src="data:image/png;base64,[LOGO OMITTED]">
-               </div>
-               """
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="data:image/png;base64,[LOGO OMITTED]">
+                </div>
+            """
 
         # Add content and page breaks
         html_content_with_logo += f"""
-           <div>
-               <div class="content-section">
-                   {html_content}
-               </div>
-               <div class="page-break"></div>
-               <div class="content-section">
-                   <h3>Additional Content</h3>
-                   <p>Include more details here.</p>
-               </div>
-           </div>
-           </body>
-           </html>
-           """
+            <div>
+                <div class="content-section">
+                    {html_content}
+                </div>
+            </div>
+            </body>
+            </html>
+        """
+
+        # Define file names
+        doc_type = 'confidential' if is_confidential else 'non_confidential'
+        html_file_path = f'/opt/{doc_type}_cover.html'
+        pdf_file_path = f'/opt/{doc_type}_cover.pdf'
+
+        # Save HTML file
+        try:
+            with open(html_file_path, 'w', encoding='utf-8') as html_file:
+                html_file.write(html_content_with_logo)
+            _logger.info(f"HTML file successfully saved at: {html_file_path}")
+        except Exception as e:
+            _logger.error(f"Failed to save HTML file: {e}")
+            raise UserError(_("Failed to save HTML file."))
+
+        # Convert HTML to PDF using wkhtmltopdf
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp_html_file:
+                tmp_html_file.write(html_content_with_logo.encode('utf-8'))
+                tmp_html_path = tmp_html_file.name
+
+            command = ['wkhtmltopdf', tmp_html_path, pdf_file_path]
+            subprocess.run(command, check=True)
+            _logger.info(f"PDF file successfully saved at: {pdf_file_path}")
+        except subprocess.CalledProcessError as e:
+            _logger.error(f"Failed to generate or save PDF file: {e}")
+            raise UserError(_("Failed to generate or save PDF file."))
+        finally:
+            # Clean up temporary HTML file
+            if tmp_html_path:
+                try:
+                    os.unlink(tmp_html_path)
+                except OSError:
+                    pass
 
         return html_content_with_logo
-
-    def _generate_cover_pdf(self, html_content_with_logo):
-        """
-        Generate a PDF from the cover page HTML content using wkhtmltopdf.
-        """
-        _logger.info("HTML Content before PDF Conversion: %s", html_content_with_logo)
-
-        pdf_cover_stream = io.BytesIO()
-        try:
-            # Create a temporary HTML file
-            temp_html_path = '/tmp/temp_cover_page.html'
-            temp_pdf_path = '/tmp/temp_cover_page.pdf'
-            with open(temp_html_path, 'w', encoding='utf-8') as f:
-                f.write(html_content_with_logo)
-
-            # Run wkhtmltopdf
-            result = subprocess.run(
-                [
-                    'wkhtmltopdf',
-                    '--enable-local-file-access',
-                    '--margin-top', '10mm',
-                    '--margin-bottom', '10mm',
-                    '--margin-left', '10mm',
-                    '--margin-right', '10mm',
-                    '--page-size', 'A4',
-                    '--load-error-handling', 'ignore',
-                    f'file://{temp_html_path}',
-                    temp_pdf_path
-                ],
-                capture_output=True, text=True
-            )
-
-            # Read the generated PDF file into memory
-            with open(temp_pdf_path, 'rb') as pdf_file:
-                pdf_cover_stream.write(pdf_file.read())
-
-            _logger.info("Cover page PDF generated successfully.")
-
-        except Exception as e:
-            _logger.error("Failed to generate cover PDF: %s", str(e))
-            raise UserError(_("Failed to generate cover PDF: %s") % str(e))
-
-        finally:
-            # Cleanup temporary files
-            os.remove(temp_html_path)
-            if os.path.exists(temp_pdf_path):
-                os.remove(temp_pdf_path)
-
-        pdf_cover_stream.seek(0)
-        return pdf_cover_stream
 
     def _get_company_logo_base64(self):
         """
@@ -1831,12 +1865,12 @@ class OdooCalendarInheritence(models.Model):
         """
         self.ensure_one()
 
-        # Step 1: Fetch the company logo and generate cover page
-        company_logo_base64 = self._get_company_logo_base64()
+        # Generate the confidential and non-confidential cover HTML and save as PDFs
+        company_logo_base64 = self.env.company.logo or None
         confidential_article_body = self.article_id.body if self.article_id else None
 
-        # Use the shared non_conf_cover_page field to fetch the article body
-        non_conf_article = self.env['knowledge.article'].search([('non_conf_cover_page', '=', self.non_conf_cover_page)], limit=1)
+        non_conf_article = self.env['knowledge.article'].search(
+            [('non_conf_cover_page', '=', self.non_conf_cover_page)], limit=1)
         non_conf_article_body = non_conf_article.body if non_conf_article else None
 
         if not confidential_article_body:
@@ -1844,13 +1878,13 @@ class OdooCalendarInheritence(models.Model):
         if not non_conf_article_body:
             raise UserError(_("No article found for non-confidential cover page."))
 
-        # Generate HTML for both covers
-        confidential_html = self._generate_cover_html(company_logo_base64, confidential_article_body)
-        non_confidential_html = self._generate_cover_html(company_logo_base64, non_conf_article_body)
+        # Generate cover pages
+        self._generate_cover_html(company_logo_base64, confidential_article_body, is_confidential=True)
+        self._generate_cover_html(company_logo_base64, non_conf_article_body, is_confidential=False)
 
-        # Generate PDFs for both covers
-        confidential_pdf_stream = self._generate_cover_pdf(confidential_html)
-        non_confidential_pdf_stream = self._generate_cover_pdf(non_confidential_html)
+        # Paths to the generated cover files
+        confidential_cover_path = '/opt/confidential_cover.pdf'
+        non_confidential_cover_path = '/opt/non_confidential_cover.pdf'
 
         # Step 3: Classify attachments
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
@@ -1859,18 +1893,18 @@ class OdooCalendarInheritence(models.Model):
             _logger.warning("No attachments found to merge.")
             return {}
 
-        # Step 3: Generate streams
+        # Step 4: Merge files
         # For Confidential: Merge cover page with all attachments
         confidential_stream = self._merge_attachments(
-            confidential_pdf_stream, confidential_attachments + non_confidential_attachments, restricted=True
+            confidential_cover_path, confidential_attachments + non_confidential_attachments
         )
 
         # For Non-Confidential: Merge cover page with only non-confidential attachments
         non_confidential_stream = self._merge_attachments(
-            non_confidential_pdf_stream, non_confidential_attachments, restricted=False
+            non_confidential_cover_path, non_confidential_attachments
         )
 
-        # Step 4: Save the documents
+        # Step 5: Save the documents
         saved_documents = {
             "Confidential": self.save_merged_document(
                 confidential_stream,
@@ -1892,7 +1926,7 @@ class OdooCalendarInheritence(models.Model):
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
 
-        # Step 5: Determine user access level
+        # Step 6: Determine user access level
         user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
                           self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
         self.is_board_park = True

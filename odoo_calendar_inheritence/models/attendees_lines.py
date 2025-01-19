@@ -12,3 +12,10 @@ class AttendeesLines(models.Model):
     position = fields.Char(string="Position")
     is_board_member = fields.Boolean(string="Board Member")
     is_board_secretary = fields.Boolean(string="Board Secretary")
+
+
+class AttendeesLines(models.Model):
+    _inherit ='res.partner'
+
+    is_board_member = fields.Boolean(string="Board Member")
+    is_board_secretary = fields.Boolean(string="Board Secretary")
