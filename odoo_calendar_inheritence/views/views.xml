@@ -226,10 +226,16 @@
                                 class="btn btn-info m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                        <button string="Update Agenda" invisible="not article_exists"
-                                name="cover_page_update" type="object"
-                                class="btn btn-success m-1" icon="fa-plus"
+
+                        <button string="View Non-Confidential Agenda" invisible="not article_exists"
+                                name="action_non_confidential_view_knowledge_article" type="object"
+                                class="btn btn-success m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+<!--                        <button string="Update Agenda" invisible="not article_exists"-->
+<!--                                name="cover_page_update" type="object"-->
+<!--                                class="btn btn-success m-1" icon="fa-plus"-->
+<!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
 
                         <button string="Reset Agenda" invisible="not article_exists"

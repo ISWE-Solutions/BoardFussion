@@ -25,7 +25,6 @@ from weasyprint import HTML
 import subprocess
 import tempfile
 
-
 _logger = logging.getLogger(__name__)
 
 CLOSED_STATES = {
@@ -1033,6 +1032,37 @@ class OdooCalendarInheritence(models.Model):
                     'res_id': record.article_id.id,
                     'target': 'current',
                 }
+
+    def action_non_confidential_view_knowledge_article(self):
+        self.ensure_one()
+
+        if not self.article_id:
+            raise ValidationError("No associated article found!")
+
+        # Define the name of the article to find (or use other criteria)
+        non_confidential_name = f"Non-Confidential Agenda: {self.name}"
+        _logger.info(f"Searching for Knowledge Article: {non_confidential_name}")
+
+        # Search for the exact article
+        non_confidential_article = self.env['knowledge.article'].sudo().search([
+            ('name', '=', non_confidential_name)
+        ], limit=1)
+
+        if not non_confidential_article:
+            raise ValidationError(f"No knowledge article found with the name '{non_confidential_name}'")
+
+        # Log the found article and its ID
+        _logger.info(f"Opening Knowledge Article: {non_confidential_article.name} (ID: {non_confidential_article.id})")
+
+        # Return an action to open the form view of the found article
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Knowledge Article',
+            'res_model': 'knowledge.article',
+            'view_mode': 'form',
+            'res_id': non_confidential_article.id,  # Open the specific article
+            'target': 'current',
+        }
 
     def action_view_description_article(self):
         self.ensure_one()
