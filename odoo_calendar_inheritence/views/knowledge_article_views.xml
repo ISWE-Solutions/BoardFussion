@@ -25,8 +25,9 @@
                         <div class="d-flex flex-row">
                             <div class="d-flex justify-content-end">
                                 <field name="is_minutes_of_meeting" invisible="1"/>
-<!--                                <button name="action_open_documents" type="object"-->
-<!--                                        string="Open Attachments" class="btn btn-info m-2" icon="fa-paperclip"/>-->
+                                <button name="publish_minutes" type="object"
+                                        string="Publish Minutes" class="btn btn-info m-2" icon="fa-paperclip" invisible="is_minutes_of_meeting"/>
+
                             </div>
                         </div>
                     </header>
@@ -35,6 +36,16 @@
             </xpath>
         </field>
     </record>
+
+
+    <!--    <record id="action_merge_minutes_documents" model="ir.actions.server">-->
+    <!--        <field name="name">Merge Minutes</field>-->
+    <!--        <field name="model_id" ref="knowledge.model_knowledge_article"/> &lt;!&ndash; Corrected reference &ndash;&gt;-->
+    <!--        <field name="state">code</field>-->
+    <!--        <field name="code">-->
+    <!--            env['calendar.event'].action_merge_minutes_documents()-->
+    <!--        </field>-->
+    <!--    </record>-->
 
 
     <!--    <record id="knowledge.knowledge_article_action"/>-->

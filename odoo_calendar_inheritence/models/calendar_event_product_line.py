@@ -183,6 +183,9 @@ class CalendarEventProductLine(models.Model):
 
             # Recalculate visible users after document creation
             record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
+            if record.calendar_id:
+                _logger.info(f"Triggering write on calendar.event ID: {record.calendar_id.id}")
+                record.calendar_id.write({'last_write_date': fields.Datetime.now()})
 
         return rtn
 
@@ -343,3 +346,5 @@ class CalendarEventProductLine(models.Model):
                 _("Use this feature to store Documents you would like to share with your members"),
             )
         }
+
+

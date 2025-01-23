@@ -90,9 +90,9 @@
                        invisible="1"
                 />
                 <!--                <field name="is_user_restricted" invisible="1"/>-->
-                <button class="oe_stat_button" name="action_open_documents" string="Documents" type="object"
+                <button class="oe_stat_button" name="action_open_documents" string="All Documents" type="object"
                         icon="fa-file-text-o">
-                    <field name="document_count" widget="statinfo" string="All Document"/>
+
                 </button>
 
                 <button
@@ -104,7 +104,7 @@
                         confirm="Do you want to proceed ?"
                         invisible="not is_board_park"
                 />
-                <button class="oe_stat_button" name="action_create_agenda_descriptions" type="object"
+                <button class="oe_stat_button" name="action_open_minutes" type="object"
                         string="View minutes"
                         icon="fa-external-link" confirm="Do you want to proceed ?"
                         invisible="not is_description_created">
@@ -221,21 +221,21 @@
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
                         />
 
-                        <button string="View Agenda" invisible="not article_exists"
+                        <button string="Confidential Agenda" invisible="not article_exists"
                                 name="action_view_knowledge_article" type="object"
                                 class="btn btn-info m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
 
-                        <button string="View Non-Confidential Agenda" invisible="not article_exists"
+                        <button string="Non-Confidential Agenda" invisible="not article_exists"
                                 name="action_non_confidential_view_knowledge_article" type="object"
                                 class="btn btn-success m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-<!--                        <button string="Update Agenda" invisible="not article_exists"-->
-<!--                                name="cover_page_update" type="object"-->
-<!--                                class="btn btn-success m-1" icon="fa-plus"-->
-<!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
+                        <!--                        <button string="Update Agenda" invisible="not article_exists"-->
+                        <!--                                name="cover_page_update" type="object"-->
+                        <!--                                class="btn btn-success m-1" icon="fa-plus"-->
+                        <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
 
                         <button string="Reset Agenda" invisible="not article_exists"
@@ -250,17 +250,32 @@
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_description_created" invisible="1"/>
+                    <field name="action_visibility" widget="radio" options="{'horizontal': true}" class="mt-2"/>
+
                     <button name="action_create_agenda_descriptions" type="object" string="Generate minutes"
                             class="btn btn-warning m-1" icon="fa-external-link" confirm="Do you want to proceed ?"
-                            invisible="is_description_created"
+                            invisible="action_visibility == 'show'"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
-                    <button/>
-                    <button name="action_open_documents" type="object" string="Upload Minutes"
-                            class="btn btn-primary" icon="fa-paperclip" confirm="Do you want to proceed ?"
+
+                    <button name="action_open_documents_minutes"
+                            type="object"
+                            string="Upload Confidential Minutes"
+                            class="btn btn-black"
+                            icon="fa-paperclip"
+                            context="{'default_confidential': True}"
+                            invisible="action_visibility == 'hide'"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
-                    <!--                    <button name="action_create_agenda_descriptions" type="object" string="View minutes"-->
-                    <!--                            class="btn btn-warning m-1" icon="fa-external-link" confirm="Do you want to proceed ?"-->
-                    <!--                            invisible="not is_description_created"/>-->
+
+                    <button name="action_open_documents_minutes"
+                            type="object"
+                            string="Upload Non-Confidential Minutes"
+                            class="btn btn-grey"
+                            icon="fa-paperclip"
+                            confirm="Do you want to proceed?"
+                            context="{'default_confidential': False}"
+                            invisible="action_visibility == 'hide'"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
                     <group string="Meeting Attendees">
                     </group>
                     <field name="attendees_lines_ids" readonly="has_attendees_confirmed" widget="one2many">
@@ -283,6 +298,20 @@
                             confirm="Do you want to proceed ?" invisible="not has_attendees_added"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
+                    <button string="Confidential Minutes" invisible="not has_attendees_added"
+                            name="action_view_description_article" type="object"
+                            class="btn btn-info m-1" icon="fa-external-link"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+                    <button string="Non Confidential Minutes" invisible="not has_attendees_added"
+                            name="action_view_alternate_description_article" type="object"
+                            class="btn btn-info m-1" icon="fa-external-link"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+<!--                    <button name="action_merge_minutes_documents"-->
+<!--                            string="publish Article"-->
+<!--                            type="object"-->
+<!--                            class="btn btn-danger"/>-->
                 </page>
             </xpath>
         </field>

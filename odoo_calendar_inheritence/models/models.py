@@ -11,6 +11,8 @@ import os
 from io import BytesIO
 from markupsafe import Markup, escape
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
+from reportlab.lib.randomtext import subjects
+
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
 from docx import Document
@@ -88,12 +90,18 @@ class OdooCalendarInheritence(models.Model):
     agenda_lines_ids = fields.One2many(comodel_name='agenda.lines', inverse_name='calendar_id', string='Lines')
     product_line_ids = fields.One2many(comodel_name='calendar.event.product.line', inverse_name='calendar_id',
                                        string='Agenda Lines')
+    minutes_line_ids = fields.One2many(comodel_name='calendar.event.minutes.line', inverse_name='calendar_id',
+                                       string='Agenda Lines')
     product_document_ids = fields.Many2many(comodel_name='product.document', compute='_compute_product_documents',
+                                            string='Product Documents')
+    minutes_document_ids = fields.Many2many(comodel_name='product.document', compute='_compute_minutes_documents',
                                             string='Product Documents')
     article_exists = fields.Boolean(compute='_compute_article_exists', store=False)
     # bp_exists = fields.Boolean(compute='_compute_article_exists', store=False)
     article_id = fields.Many2one('knowledge.article', string='Related Article')
+    non_confidential_article_id = fields.Many2one('knowledge.article', string='Related Article')
     description_article_id = fields.Many2one('knowledge.article', string='Related Description Article')
+    alternate_description_article_id = fields.Many2one('knowledge.article', string='Related NON-confidential Description Article')
     task_created = fields.Boolean(string="Task Created", default=False)
     description = fields.Html(string="Description")
     attendees_lines_ids = fields.One2many('attendees.lines', 'calendar_id')
@@ -123,30 +131,10 @@ class OdooCalendarInheritence(models.Model):
         string="Document Restricted Visibility",
         store=True
     )
-    #
-    # @api.depends('calendar_id', 'calendar_id.Restricted')
-    # def _compute_restricted(self):
-    #     for record in self:
-    #         if record.calendar_id:
-    #             # Log the related Restricted values for debugging
-    #             print(f"Related Restricted values: {record.calendar_id.Restricted}")
-    #             record.Restricted = record.calendar_id.Restricted
-    #         else:
-    #             record.Restricted = False
-
-    # Restricted = fields.Many2many(
-    #     'res.partner',
-    #     'calendar_event_res_partner_restricted_rel',  # Custom relation table name
-    #     string="Document visibility",
-    #     tracking=True
-    # )
-
-    # is_user_restricted = fields.Boolean(compute='_compute_is_user_restricted', store=False)
-    #
-    # @api.depends('Restricted')
-    # def _compute_is_user_restricted(self):
-    #     for record in self:
-    #         record.is_user_restricted = self.env.user.partner_id in record.Restricted
+    action_visibility = fields.Selection([
+        ('show', 'upload'),
+        ('hide', 'Generate'),
+    ], string="Action Visibility", default='show')
 
     # visibility
     privacy = fields.Selection(
@@ -203,12 +191,6 @@ class OdooCalendarInheritence(models.Model):
 
     @api.model_create_multi
     def create(self, values):
-        print("MAIN CREATE")
-        # for value in values:
-        #     if not value.get('name') or value['name'] == _('new'):
-        #
-        #         # self._check_unique_agenda(value['agenda'])
-        # print(self._context.get('dont_create_nested'))
         for rec in values:
             if not rec.get('nested_calender'):
                 # print("Here NOT")
@@ -506,7 +488,7 @@ class OdooCalendarInheritence(models.Model):
             </div>
                 <br>
                 <br>
-                   <h3> Confidential </h3>
+                   <h3> <strong style="text-decoration:underline;"> CONFIDENTIAL </strong></h3>
                 <br>
                 <div class="container">
                     {description_content}
@@ -910,115 +892,162 @@ class OdooCalendarInheritence(models.Model):
         _logger.info("Updated article content successfully.")
         self.article_id.sudo().write({'body': Markup(updated_content)})
 
+    def action_delete_agenda_descriptions(self):
+        try:
+            # Unlink the original article if it exists
+            if self.description_article_id:
+                self.description_article_id.sudo().unlink()
+                self.description_article_id = False
+
+            # Unlink the alternate article if it exists
+            if self.alternate_description_article_id:
+                self.alternate_description_article_id.sudo().unlink()
+                self.alternate_description_article_id = False
+
+            # Reset the description creation flag
+            self.is_description_created = False
+
+            # Reload the view
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'reload',
+            }
+        except Exception as e:
+            raise UserError(f"An error occurred while deleting the articles: {str(e)}")
+
     def action_create_agenda_descriptions(self):
-        company_id = self.env.company
-        # Get the company logo
-        logo = company_id.logo
-        if logo:
-            logo_html = Markup('<img src="%s" class="bg-view" alt="Company Logo"/>') % self._get_src_data_b64(logo)
-            # print(logo_html)
         if not self.product_line_ids:
             raise ValidationError("Please add data before making an Article!")
-        if not self.description_article_id:
-            counter = 1
-            company_id = self.env.company
-            mom_description_content = Markup("""""")
-            attendees_names = Markup("""""")
 
-            # Build the table rows for each agenda line
-            for line in self.product_line_ids:
-                mom_description_content += Markup("""
-                            {description}<hr>
-                            """).format(
-                    description=line.description or ''
-                )
-                counter += 1
-            attendees = self.action_confirm_attendees()
-            self.has_attendees_confirmed = True
-            if attendees:
-                attendees_names += Markup("""
-                                                    <strong>Meeting Attendees:</strong><br><br>
-                """)
-            for attendee in attendees:
-                if attendee:
-                    attendees_names += Markup("""
-                                    {attendee_name}<br>
-                """).format(attendee_name=attendee.attendee_name)
-            attendees_names += Markup("""
-                        <hr>
-                """)
+        self.action_delete_agenda_descriptions()
 
-            body_content = Markup("""
-                <div>
-                    <header style="text-align: center;">
+        # Initialize attendee lists
+        attendees_present = []  # For board members and board secretary
+        attendees_in_attendance = []  # For other attendees
+
+        if not self.attendees_lines_ids:
+            raise UserError(_('Kindly, add the attendees!'))
+
+        # Classify attendees into two sections
+        for attendee in self.attendees_lines_ids:
+            if attendee.has_attended:
+                if attendee.is_board_member or attendee.is_board_secretary:
+                    attendees_present.append(attendee)
+                else:
+                    attendees_in_attendance.append(attendee)
+
+        # Generate the HTML for attendees
+        def format_attendees_section(title, attendees):
+            if not attendees:
+                return ""
+            section = f"""
+            <div class="table-responsive my-3" style="border:none;">
+                <table class="table" style="table-layout: fixed; width: 100%; border: none; border-collapse: collapse;">
+                    <colgroup style="border:none;">
+                        <col style="width: 10%;" /> <!-- Title column -->
+                        <col style="width: 5%;" />  <!-- Colon column -->
+                        <col style="width: 85%;" /> <!-- Attendees column -->
+                    </colgroup>
+                    <tbody style="border:none;">
+                        <tr style="border:none;">
+                            <td rowspan="{len(attendees)}" class="fw-bold" style="border:none;">{title}</td>
+                            <td rowspan="{len(attendees)}" class="text-center" style="border:none;">:</td>
+                            <td style="border:none;">{attendees[0].attendee_name} <span class="text-muted" style="border:none">({attendees[0].position})</span></td>
+                        </tr>
+            """
+            for attendee in attendees[1:]:
+                section += f"""
+                        <tr style="border:none;">
+                            <td style="border:none">{attendee.attendee_name} <span class="text-muted" style="border:none">({attendee.position})</span></td>
+                        </tr>
+                """
+            section += """
+                    </tbody>
+                </table>
+            </div>
+            """
+            return section
+
+        # Generate the sections
+        section_present = format_attendees_section("PRESENT", attendees_present)
+        section_in_attendance = format_attendees_section("IN ATTENDANCE", attendees_in_attendance)
+
+        # Combine attendee sections
+        attendees_section = section_present + section_in_attendance
+
+        # Generate the table for product lines
+        def build_minutes_table(lines, is_confidential=False):
+            html_content = """
+                <table class="agenda-table table" style="width: 100%; table-layout: fixed; border: none; border-collapse: collapse;">
+                    <colgroup style="border:none;">
+                        <col style="width: 10%;" /> <!-- First column: 10% -->
+                        <col style="width: 90%;" /> <!-- Second column: 90% -->
+                    </colgroup>
+                    <tbody style="border:none;">
+            """
+            for counter, line in enumerate(lines, start=1):
+                description = "Confidential" if is_confidential and line.confidential else (line.description or '')
+                html_content += f"""
+                    <tr style="border:none;">
+                        <td style="padding: 10px; text-align: center; border:none;">{counter}</td>
+                        <td style="padding: 10px; text-align: justify; border:none;">{description}</td>
+                    </tr>
+                """
+            html_content += "</tbody></table>"
+            return html_content
+
+        # Create original and alternate minutes tables
+        original_minutes_table = build_minutes_table(self.product_line_ids)
+        alternate_minutes_table = build_minutes_table(self.product_line_ids, is_confidential=True)
+
+        # Add company information
+        company_id = self.env.company
+        logo_html = f'<img src="/web/image/res.company/{company_id.id}/logo" class="bg-view" alt="Company Logo"/>' if company_id.logo else ''
+        subject = self.name
+
+        # Build the final body content
+        # Build the final body content
+
+        def build_body_content(subject, minutes_table):
+            return f"""
+                <div style="border:none;">
+                    <header style="text-align: center; border:none;">
                         {logo_html}<br><br>
-                        <h2><strong>{company_name}<strong></h2>
+                        <h2><strong>{company_id.name}</strong></h2>
                     </header>
-                    <div class="container">
-                        <div class="card-body border-dark">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col align-items-center">
-                                    <!-- Name and position -->
-                                    <p class="mb-0">
-                                        <span> {company_street} </span>
-                                    </p>
-                                    <p class="mb-0">
-                                        <span> {company_city} </span>
-                                    </p>
-                                    <p class="m-0">
-                                        <span> {company_country} </span>
-                                    </p>
-                                </div>
-                                <div class="col-auto">
-                                    <!-- Phone and email -->
-                                    <div class="float-right text-end">
-                                        <p class="mb-0 float-right">
-                                            <span> {company_phone} </span>
-                                            <i class="fa fa-phone-square ms-2 text-info" title="Phone"/>
-                                        </p>
-                                        <p class="mb-0 float-right">
-                                            <span> {company_email} </span>
-                                            <i class="fa fa-envelope ms-2 text-info" title="Email"/>
-                                        </p>
-                                        <p class="mb-0 float-right">
-                                            <span> {company_website} </span>
-                                            <i class="fa fa-globe ms-2 text-info" title="Website"/>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div><br><hr>
-                    {attendees_names}
                     <br>
-                    {mom_description_content}
+                    <h3><strong style="text-decoration:underline;">CONFIDENTIAL</strong></h3>
+                    <h3><strong style="text-decoration:underline;">{subject}</strong></h3>
+                    <hr style="border:none">
+                    {attendees_section}
+                    {minutes_table}
                 </div>
-            """).format(
-                logo_html=logo_html,
-                company_name=company_id.name,
-                company_street=company_id.street,
-                company_city=company_id.city,
-                company_country=company_id.country_id.name,
-                company_phone=company_id.phone,
-                company_email=company_id.email,
-                company_website=company_id.website,
-                attendees_names=attendees_names,
-                mom_description_content=mom_description_content,
-            )
-            article_values = {
-                'name': f"Minutes: {self.name}",  # Name for the description, for that Agenda!
-                'body': body_content,
-                'calendar_id': self.id,
-            }
+            """
 
-            description_article = self.env['knowledge.article'].sudo().create(article_values)
-            self.description_article_id = description_article
-            self.description_article_id.product_id = self.product_id.id
-            self.is_description_created = True
-            self.description_article_id.is_minutes_of_meeting = True
-            return self.action_view_description_article()
-        else:
-            return self.action_view_description_article()
+        # Create the articles
+        original_body_content = build_body_content(subject, original_minutes_table)
+        alternate_body_content = build_body_content(subject, alternate_minutes_table)  # Pass as two arguments
+
+        # Create original article
+        original_article_values = {
+            'name': f"Minutes: {self.name}",
+            'body': original_body_content,
+            'calendar_id': self.id,
+        }
+        original_article = self.env['knowledge.article'].sudo().create(original_article_values)
+        self.description_article_id = original_article
+
+        # Create alternate article
+        alternate_article_values = {
+            'name': f"Minutes: {self.name} (Non-Confidential)",
+            'body': alternate_body_content,
+            'calendar_id': self.id,
+        }
+        alternate_article = self.env['knowledge.article'].sudo().create(alternate_article_values)
+        self.alternate_description_article_id = alternate_article
+
+        self.is_description_created = True
+        return self.action_view_description_article()
 
     def action_view_knowledge_article(self):
         self.ensure_one()
@@ -1076,6 +1105,41 @@ class OdooCalendarInheritence(models.Model):
                 'target': 'current',
             }
 
+    def action_view_alternate_description_article(self):
+        self.ensure_one()
+        if self.alternate_description_article_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': 'Knowledge Article',
+                'res_model': 'knowledge.article',
+                'view_mode': 'form',
+                'res_id': self.alternate_description_article_id.id,
+                'target': 'current',
+            }
+
+    def action_open_documents_minutes(self):
+        self.ensure_one()
+        confidential = self.env.context.get('default_confidential', False)
+
+        # Create a new record or update the confidential field
+        product_line = self.env['calendar.event.minutes.line'].create({
+            'calendar_id': self.id,
+            'confidential': confidential,
+        })
+
+        # Explicitly call the onchange method to apply the desired logic
+        product_line._onchange_confidential()
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Minutes Upload',
+            'res_model': 'calendar.event.minutes.line',
+            'res_id': product_line.id,  # Open the created/updated record
+            'view_mode': 'form',
+            'view_id': self.env.ref('odoo_calendar_inheritence.calendar_event_product_line_form_view_minutes').id,
+            'target': 'new',
+        }
+
     # -------------------------------------------------------------------
     # -------------------------------------------------------------------
     #
@@ -1097,6 +1161,19 @@ class OdooCalendarInheritence(models.Model):
                 event.product_document_ids = [(6, 0, documents.ids)]
             else:
                 event.product_document_ids = [(5,)]  # Clear if no products
+                print(f"No products found for event {event.id}, clearing documents.")
+
+    @api.depends('minutes_line_ids')
+    def _compute_minutes_documents(self):
+        for event in self:
+            product_ids = event.minutes_line_ids.mapped('product_id')
+            print(f"Computing product documents for event {event.id}, product_ids: {product_ids.ids}")
+            if product_ids:
+                documents = self.env['product.document'].search([('product_id', 'in', product_ids.ids)])
+                print(f"Found documents: {documents.ids} for product_ids: {product_ids.ids}")
+                event.minutes_document_ids = [(6, 0, documents.ids)]
+            else:
+                event.minutes_document_ids = [(5,)]  # Clear if no products
                 print(f"No products found for event {event.id}, clearing documents.")
 
     @api.onchange('new_project_id')
@@ -1203,17 +1280,6 @@ class OdooCalendarInheritence(models.Model):
                     else:
                         record.is_meeting_finished = False
 
-    def action_confirm_attendees(self):
-        attendees = []
-        if not self.attendees_lines_ids:
-            raise UserError(_('Kindly, add the attendees!'))
-        for attendee in self.attendees_lines_ids:
-            if attendee.has_attended:
-                attendees.append(attendee)
-        return attendees
-
-        # self.attendees_lines_ids =
-
     def _compute_document_count(self):
         active_user = self.env.user.partner_id.id
         domain = [
@@ -1284,6 +1350,76 @@ class OdooCalendarInheritence(models.Model):
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
 
+    def action_open_minutes(self):
+        self.ensure_one()
+
+        # Fetch Confidential and Non-Confidential boardpacks directly linked to the event
+        confidential_attachment_id = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', 'ilike', f"{self.name}_Minutes_Confidential.pdf")
+        ], limit=1)
+
+        non_confidential_attachment_id = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', 'ilike', f"{self.name}_Minutes_NonConfidential.pdf")
+        ], limit=1)
+
+        # Check if the user is a Board Member or Board Secretary
+        is_board_member_or_secretary = self.env.user.has_group(
+            'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
+                                       self.env.user.has_group(
+                                           'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
+        # Determine accessible files from the main event
+        accessible_attachment_ids = []
+        if non_confidential_attachment_id:
+            accessible_attachment_ids.append(non_confidential_attachment_id.id)
+        if is_board_member_or_secretary and confidential_attachment_id:
+            accessible_attachment_ids.append(confidential_attachment_id.id)
+
+        # Fetch uploaded attachments from related minutes lines
+        minutes_lines = self.env['calendar.event.minutes.line'].search([('calendar_id', '=', self.id)])
+        uploaded_attachment_ids = minutes_lines.mapped('pdf_attachment').ids
+
+        # Filter attachments based on restrictions
+        for line in minutes_lines:
+            if line.is_user_restricted:
+                uploaded_attachment_ids = list(set(uploaded_attachment_ids) - set(line.pdf_attachment.ids))
+
+        # Combine attachments from both sources
+        all_accessible_attachment_ids = list(set(accessible_attachment_ids + uploaded_attachment_ids))
+
+        # Log accessible attachments
+        _logger.info("User %s is accessing the following attachments: %s",
+                     self.env.user.name, all_accessible_attachment_ids)
+
+        # Check if no files are accessible
+        if not all_accessible_attachment_ids:
+            _logger.info("No accessible attachments for user %s on event %s", self.env.user.name, self.name)
+            return {'type': 'ir.actions.act_window_close'}
+
+        # Fetch matching product documents
+        matching_documents = self.env['product.document'].search(
+            [('ir_attachment_id', 'in', all_accessible_attachment_ids)])
+        _logger.info("Matching Product Document count for user %s: %d", self.env.user.name, len(matching_documents))
+
+        # Log retrieved document names
+        _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
+                     matching_documents.mapped('name'))
+
+        active_user = self.env.user.partner_id.id
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Documents',
+            'res_model': 'product.document',
+            'view_mode': 'kanban,tree,form',
+            'domain': [('id', 'in', matching_documents.ids)],
+            'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
+        }
+
     def action_open_documents(self):
         self.ensure_one()
 
@@ -1310,6 +1446,11 @@ class OdooCalendarInheritence(models.Model):
             if not line.is_user_restricted:
                 unrestricted_attachment_ids.extend(line.pdf_attachment.ids)
 
+        minutes_attachment_ids = []
+        for line in self.minutes_line_ids:
+            if not line.is_user_restricted:
+                minutes_attachment_ids.extend(line.pdf_attachment.ids)
+
         # Check if user is Board Member or Board Secretary
         is_board_member_or_secretary = self.env.user.has_group(
             'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
@@ -1317,7 +1458,7 @@ class OdooCalendarInheritence(models.Model):
                                            'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
 
         # Combine all accessible files
-        all_attachment_ids = unrestricted_attachment_ids + non_confidential_attachment_ids
+        all_attachment_ids = unrestricted_attachment_ids + minutes_attachment_ids + non_confidential_attachment_ids
         if is_board_member_or_secretary:
             all_attachment_ids += confidential_attachment_ids
 
@@ -1338,13 +1479,20 @@ class OdooCalendarInheritence(models.Model):
         _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
                      matching_documents.mapped('name'))
 
+        # Get active user partner ID
+        active_user = self.env.user.partner_id.id
+
         # Return action to open documents
         return {
             'type': 'ir.actions.act_window',
             'name': 'Documents',
             'res_model': 'product.document',
             'view_mode': 'kanban,tree,form',
-            'domain': [('id', 'in', matching_documents.ids)],
+            'domain': [
+                '&',
+                ('id', 'in', matching_documents.ids),
+                ('partner_ids', 'in', [active_user])
+            ],
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
 
@@ -1409,16 +1557,6 @@ class OdooCalendarInheritence(models.Model):
                                  raise_if_not_found=False)
                 )
         return True
-
-    # def unlink(self):
-    #     # Raise a warning before deletion
-    #     for event in self:
-    #         message = _(
-    #             "Action points, documents, agenda, and minutes will be permanently deleted. Are you sure you want to continue?")
-    #         raise UserError(message)
-    #
-    #     # If confirmed, perform the standard deletion
-    #     return super(OdooCalendarInheritence, self).unlink()
 
     def copy(self, default=None):
         default = dict(default or {})
@@ -1877,6 +2015,91 @@ class OdooCalendarInheritence(models.Model):
 
         return html_content_with_logo
 
+    def _generate_minutes_cover_html(self, company_logo_base64, article_body, is_confidential=True):
+        """
+        Generate HTML content for the cover page, save as both HTML and PDF.
+        """
+        if not article_body:
+            raise UserError(_("No article body found to generate the cover page."))
+
+        html_content = article_body
+
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        html_content = html_content.replace('/web/image', f'{base_url}/web/image')
+
+        bootstrap_url = f'{base_url}/odoo_calendar_inheritence/static/src/bootstrap-5.1.3/css/bootstrap.min.css'
+        bootstrap_css = f'<link rel="stylesheet" href="{bootstrap_url}">'
+
+        html_content_with_logo = f"""
+               <!DOCTYPE html>
+               <html lang="en">
+               <head>
+                   <meta charset="UTF-8">
+                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                   {bootstrap_css}
+                   <style>
+                       .page-break {{ 
+                           page-break-before: always; 
+                           margin-top: 10mm;
+                       }}
+                   </style>
+               </head>
+               <body>
+           """
+        if company_logo_base64:
+            html_content_with_logo += """
+                   <div style="text-align: center; margin-bottom: 20px;">
+                       <img src="data:image/png;base64,[LOGO OMITTED]">
+                   </div>
+               """
+
+        # Add content and page breaks
+        html_content_with_logo += f"""
+               <div>
+                   <div class="content-section">
+                       {html_content}
+                   </div>
+               </div>
+               </body>
+               </html>
+           """
+
+        # Define file names
+        doc_type = 'confidential' if is_confidential else 'non_confidential'
+        html_file_path = f'/opt/{doc_type}_minutes_cover.html'
+        pdf_file_path = f'/opt/{doc_type}_minutes_cover.pdf'
+
+        # Save HTML file
+        try:
+            with open(html_file_path, 'w', encoding='utf-8') as html_file:
+                html_file.write(html_content_with_logo)
+            _logger.info(f"HTML file successfully saved at: {html_file_path}")
+        except Exception as e:
+            _logger.error(f"Failed to save HTML file: {e}")
+            raise UserError(_("Failed to save HTML file."))
+
+        # Convert HTML to PDF using wkhtmltopdf
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as tmp_html_file:
+                tmp_html_file.write(html_content_with_logo.encode('utf-8'))
+                tmp_html_path = tmp_html_file.name
+
+            command = ['wkhtmltopdf', tmp_html_path, pdf_file_path]
+            subprocess.run(command, check=True)
+            _logger.info(f"PDF file successfully saved at: {pdf_file_path}")
+        except subprocess.CalledProcessError as e:
+            _logger.error(f"Failed to generate or save PDF file: {e}")
+            raise UserError(_("Failed to generate or save PDF file."))
+        finally:
+            # Clean up temporary HTML file
+            if tmp_html_path:
+                try:
+                    os.unlink(tmp_html_path)
+                except OSError:
+                    pass
+
+        return html_content_with_logo
+
     def _get_company_logo_base64(self):
         """
         Fetch the company logo and return it as a Base64-encoded string.
@@ -1965,6 +2188,82 @@ class OdooCalendarInheritence(models.Model):
         # Explicitly return the action to propagate it
         return action
 
+    def action_merge_minutes_documents(self):
+        """
+        Merge attachments into two distinct documents for meeting minutes:
+        Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
+        Stream the appropriate document based on user roles.
+        """
+        self.ensure_one()
+
+        # Generate the confidential and non-confidential cover HTML and save as PDFs
+        company_logo_base64 = self.env.company.logo or None
+        confidential_minutes_article_body = self.description_article_id.body if self.description_article_id else None
+
+        non_conf_minutes_article = self.env['knowledge.article'].search(
+            [('id', '=', self.alternate_description_article_id.id)], limit=1)
+        non_conf_minutes_article_body = non_conf_minutes_article.body if non_conf_minutes_article else None
+
+        if not confidential_minutes_article_body:
+            raise UserError(_("No article found for confidential minutes cover page."))
+        if not non_conf_minutes_article_body:
+            raise UserError(_("No article found for non-confidential minutes cover page."))
+
+        # Generate cover pages
+        self._generate_minutes_cover_html(company_logo_base64, confidential_minutes_article_body, is_confidential=True)
+        self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
+
+        # Paths to the generated cover files
+        confidential_cover_path = '/opt/confidential_minutes_cover.pdf'
+        non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
+
+        # Classify attachments for minutes
+        confidential_attachments, non_confidential_attachments = self._classify_attachments()
+
+        if not confidential_attachments and not non_confidential_attachments:
+            _logger.warning("No attachments found to merge for minutes.")
+            return {}
+
+        # Merge files
+        # For Confidential: Merge cover page with all attachments
+        confidential_stream = self._merge_attachments(
+            confidential_cover_path, confidential_attachments + non_confidential_attachments
+        )
+
+        # For Non-Confidential: Merge cover page with only non-confidential attachments
+        non_confidential_stream = self._merge_attachments(
+            non_confidential_cover_path, non_confidential_attachments
+        )
+
+        # Save the documents
+        saved_documents = {
+            "Confidential": self.save_merged_document(
+                confidential_stream,
+                filename_suffix="_Minutes_Confidential.pdf",
+                description=f"Confidential minutes for event {self.name}"
+            ),
+            "NonConfidential": self.save_merged_document(
+                non_confidential_stream,
+                filename_suffix="_Minutes_NonConfidential.pdf",
+                description=f"Non-confidential minutes for event {self.name}"
+            ),
+        }
+
+        # Log details of saved documents
+        _logger.info("Number of minutes files saved: %d", len(saved_documents))
+        for doc_type, attachment in saved_documents.items():
+            if attachment:
+                _logger.info("Saved minutes document: %s (Type: %s)", attachment.name, doc_type)
+            else:
+                _logger.warning("No document saved for type: %s", doc_type)
+
+        # Determine user access level
+        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
+                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+
+        # Explicitly return the action or any additional UI updates as needed
+        return self.action_open_minutes()
+
 
 class AgendaLines(models.Model):
     _name = 'agenda.lines'
@@ -1975,3 +2274,6 @@ class AgendaLines(models.Model):
     partner_ids = fields.Many2many('res.partner', string='Attendees')
     duration = fields.Float(related="calendar_id.duration", string='Duration')
     agenda_attachment_ids = fields.Many2many(comodel_name='ir.attachment', string="Attachments")
+
+
+

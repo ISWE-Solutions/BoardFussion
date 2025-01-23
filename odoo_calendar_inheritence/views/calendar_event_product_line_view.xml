@@ -9,6 +9,7 @@
         <field name="groups" eval="[(4, ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')),
                                  (4, ref('odoo_calendar_inheritence.group_agenda_meeting_board_member'))]"/>
     </record>
+
     <record id="calendar_event_product_line_form_view" model="ir.ui.view">
         <field name="name">calendar.event.product.line.form.view</field>
         <field name="model">calendar.event.product.line</field>
@@ -16,12 +17,13 @@
             <form string="Agenda Form" class="larger-wizard modal-xl">
                 <sheet invisible="not user_is_board_member_or_secretary, confidential">
                     <div class="o_group">
-                        <group >
+                        <group>
                             <field name="confidential" invisible="1"/>
                             <field name="user_is_board_member_or_secretary" invisible="1"/>
                             <!-- Description Field -->
                             <field name="description" widget="textarea" placeholder="Agenda Item"
-                                   class="larger-description" invisible="not user_is_board_member_or_secretary, confidential"
+                                   class="larger-description"
+                                   invisible="not user_is_board_member_or_secretary, confidential"
                             />
                         </group>
                         <group>
@@ -36,6 +38,33 @@
                                    placeholder="Attachments"/>
                             <field name="confidential"
                                    groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                            <field name="Restricted" widget="many2many_tags"
+                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                        </group>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+
+    <record id="calendar_event_product_line_form_view_minutes" model="ir.ui.view">
+        <field name="name">calendar.event.minutes.line.form.view.minutes</field>
+        <field name="model">calendar.event.minutes.line</field>
+        <field name="arch" type="xml">
+            <form string="Minutes Upload" class="larger-wizard modal-xl">
+                <sheet invisible="not user_is_board_member_or_secretary, confidential">
+                    <div class="o_group">
+                        <group>
+                            <field name="confidential" invisible="0"/>
+                            <field name="user_is_board_member_or_secretary" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="calendar_id" invisible="1"/>
+                            <field name="is_user_restricted" invisible="1"/>
+                            <field name="pdf_attachment" widget="many2many_binary"
+                                   groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
+                                   placeholder="Attachments"/>
                             <field name="Restricted" widget="many2many_tags"
                                    groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                         </group>
@@ -84,4 +113,14 @@
             </p>
         </field>
     </record>
+
+    <record id="action_open_calendar_event_product_line" model="ir.actions.act_window">
+        <field name="name">Minutes Upload</field>
+        <field name="res_model">calendar.event.minutes.line</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="calendar_event_product_line_form_view_minutes"/>
+        <field name="target">new</field>
+    </record>
+
+
 </odoo>

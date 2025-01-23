@@ -18,6 +18,19 @@ class KnowledgeArticle(models.Model):
     non_conf_cover_page = fields.Char(help="this field is used in tracking non confidential cover page",
                                       string="Non confidential cover page")
 
+    def publish_minutes(self):
+        for record in self:
+            # Ensure the article is linked to a calendar event
+            if record.calendar_id:
+                # Invoke the `action_merge_minutes_documents` method on the related calendar event
+                record.calendar_id.action_merge_minutes_documents()
+
+                # After merging, invoke the `action_open_minutes` method
+                record.is_minutes_of_meeting = True
+                return record.calendar_id.action_open_minutes()
+            else:
+                # Log a warning or raise an exception if no calendar event is linked
+                raise UserError("No Calendar Event is linked to this Knowledge Article.")
 
     def action_open_documents(self):
         # self.ensure_one()
