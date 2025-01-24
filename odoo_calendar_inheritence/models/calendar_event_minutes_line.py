@@ -133,40 +133,74 @@ class CalendarEventMinutesLine(models.Model):
     def _process_minutes_line(self):
         """Handles logic for processing product documents and attachments."""
         document_model = self.env['product.document']
-        for record in self:
-            if not record.product_id:
-                record.product_id = record.calendar_id.product_id.id
-            product = record.product_id
+        success = True
+        message = _("Minutes processed successfully.")
+        message_type = "success"
 
-            # Ensure product_document_id is set
-            if not record.product_document_id:
-                new_document = document_model.sudo().create({
-                    'res_model': 'product.template',
-                    'name': product.display_name,
-                    'res_id': product.id,
-                })
-                record.product_document_id = new_document.id
-                _logger.info(
-                    f"Assigned product_document_id {new_document.id} to Calendar Event Minutes Line {record.id}")
+        try:
+            for record in self:
+                if not record.product_id:
+                    record.product_id = record.calendar_id.product_id.id
 
-            # Process PDF attachments
-            if record.pdf_attachment:
-                for attachment in record.pdf_attachment:
-                    # Ensure attachment is linked to the calendar event
-                    attachment.write({
-                        'res_model': 'calendar.event',
-                        'res_id': record.calendar_id.id,
-                    })
+                product = record.product_id
 
-                    restricted_partner_ids = list(set(record.Restricted.ids))
+                # Ensure product_document_id is set
+                if not record.product_document_id:
                     new_document = document_model.sudo().create({
                         'res_model': 'product.template',
-                        'name': attachment.name,
+                        'name': product.display_name,
                         'res_id': product.id,
-                        'ir_attachment_id': attachment.id,
-                        'partner_ids': [(6, 0, restricted_partner_ids)]
                     })
+                    record.product_document_id = new_document.id
                     _logger.info(
-                        f"Created new Minute document {new_document.id} for attachment {attachment.id} "
-                        f"and linked it to Calendar Event {record.calendar_id.id}"
+                        f"Assigned product_document_id {new_document.id} to Calendar Event Minutes Line {record.id}"
                     )
+
+                # Process PDF attachments
+                if record.pdf_attachment:
+                    for attachment in record.pdf_attachment:
+                        # Ensure attachment is linked to the calendar event
+                        attachment.write({
+                            'res_model': 'calendar.event',
+                            'res_id': record.calendar_id.id,
+                        })
+
+                        restricted_partner_ids = list(set(record.Restricted.ids))
+                        new_document = document_model.sudo().create({
+                            'res_model': 'product.template',
+                            'name': attachment.name,
+                            'res_id': product.id,
+                            'ir_attachment_id': attachment.id,
+                            'partner_ids': [(6, 0, restricted_partner_ids)]
+                        })
+                        _logger.info(
+                            f"Created new Minute document {new_document.id} for attachment {attachment.id} "
+                            f"and linked it to Calendar Event {record.calendar_id.id}"
+                        )
+
+                # Set is_minutes_created to True on the associated calendar.event
+                if record.calendar_id and not record.calendar_id.is_minutes_created:
+                    record.calendar_id.is_minutes_created = True
+                    _logger.info(f"Set is_minutes_created to True for Calendar Event {record.calendar_id.id}")
+
+        except Exception as e:
+            success = False
+            message = _("An error occurred while processing minutes: %s") % str(e)
+            message_type = "danger"
+            _logger.error(message)
+
+        # Return a notification
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Notification"),
+                'message': message,
+                'type': message_type,  # 'success', 'warning', 'danger', or 'info'
+                'sticky': False,  # Notification disappears after some time
+            },
+        }
+
+
+
+

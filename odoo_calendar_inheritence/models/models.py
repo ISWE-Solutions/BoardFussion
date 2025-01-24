@@ -151,6 +151,9 @@ class OdooCalendarInheritence(models.Model):
         string="Employee Partners"
     )
 
+    is_minutes_created = fields.Boolean(string = "Are minutes Generated or Uploaded")
+    is_boardpack_created = fields.Boolean(string="Are Boardpacks Generated")
+
     def _compute_employee_partner_ids(self):
         employees = self.env['hr.employee'].search([])
         self.employee_partner_ids = employees.mapped('address_home_id')
@@ -1047,6 +1050,7 @@ class OdooCalendarInheritence(models.Model):
         self.alternate_description_article_id = alternate_article
 
         self.is_description_created = True
+        self.is_minutes_created = True
         return self.action_view_description_article()
 
     def action_view_knowledge_article(self):
@@ -1140,16 +1144,6 @@ class OdooCalendarInheritence(models.Model):
             'target': 'new',
         }
 
-    # -------------------------------------------------------------------
-    # -------------------------------------------------------------------
-    #
-    # @api.depends('product_line_ids')
-    # def _compute_product_documents(self):
-    #     for event in self:
-    #         product_ids = event.product_line_ids.mapped('product_id')
-    #         documents = self.env['product.document'].search([('product_id', 'in', product_ids.ids)])
-    #         event.product_document_ids = [5, 0, [documents.ids]]
-
     @api.depends('product_line_ids')
     def _compute_product_documents(self):
         for event in self:
@@ -1216,7 +1210,9 @@ class OdooCalendarInheritence(models.Model):
             rec.is_description_created = False
             rec.has_attendees_added = False
             rec.has_attendees_confirmed = False
+            rec.is_minutes_created = False
             rec.description_article_id.sudo().unlink()
+            rec.action_delete_agenda_descriptions()
 
     def action_add_attendees(self):
         partners = []
@@ -1349,7 +1345,6 @@ class OdooCalendarInheritence(models.Model):
             ],
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
-
 
     def action_open_minutes(self):
         self.ensure_one()

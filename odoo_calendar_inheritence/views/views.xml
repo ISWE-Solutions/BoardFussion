@@ -79,9 +79,9 @@
             <xpath expr="//field[@name='description']" position="after">
                 <field name="product_id" invisible="1"/>
             </xpath>
-            <xpath expr="//field[@name='description']" position="after">
-                <field name="product_id" invisible="1"/>
-            </xpath>
+<!--            <xpath expr="//field[@name='videocall_location']" position="attributes">-->
+<!--                <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>-->
+<!--            </xpath>-->
 
             <xpath expr="//div[@name='button_box']" position="inside">
                 <field name="company_id" invisible="1"/>
@@ -122,8 +122,8 @@
             <!--            <xpath expr="//button[@name='action_open_composer']" position="replace"/>-->
             <xpath expr="//button[@name='action_send_sms']" position="replace"/>
             <xpath expr="//page[@name='page_invitations']//button[@name='action_sendmail']" position="replace">
-                <button name="action_open_custom_composer" help="Send Email to attendees" type="object" string="EMAIL"
-                        icon="fa-envelope" invisible="not user_can_edit"/>
+                <!--                <button name="action_open_custom_composer" help="Send Email to attendees" type="object" string="EMAIL"-->
+                <!--                        icon="fa-envelope" invisible="not user_can_edit" groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
             </xpath>
             <!--            <xpath expr="//page[@name='page_invitations']" position="attributes">-->
             <!--                <attribute name="invisible">1</attribute>-->
@@ -141,7 +141,7 @@
             <xpath expr="//page[@name='page_invitations']" position="replace">
                 <page name="page_invitations" string="Invitations" invisible="not product_id">
                     <button name="action_agenda_inv_sendmail" type="object" string="Send Invitations" icon="fa-envelope"
-                            class="oe_link"/>
+                            class="oe_link" groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                     <field name="attendee_ids" widget="one2many" mode="tree" readonly="0">
                         <tree string="Invitation details" editable="top" create="false" delete="false">
                             <field name="partner_id"/>
@@ -206,6 +206,7 @@
 
                     <div>
                         <field name="article_exists" invisible="1"/>
+                        <field name="is_minutes_created" invisible="1"/>
                         <!--                        <button string="Create Board Pack" name="action_create_html_all" type="object"-->
                         <!--                                class="btn btn-primary m-1" icon="fa-plus" invisible="article_exists"-->
                         <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
@@ -216,18 +217,18 @@
                                 confirm="Do you want to Build Agenda?"/>
 
                         <button name="action_merge_documents" type="object" string="Board Pack"
-                                invisible="not article_exists"
+                                invisible="not article_exists or is_minutes_created"
                                 class="btn btn-primary m-1" icon="fa-plus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
                         />
 
-                        <button string="Confidential Agenda" invisible="not article_exists"
+                        <button string="Confidential Agenda" invisible="not article_exists or is_minutes_created"
                                 name="action_view_knowledge_article" type="object"
                                 class="btn btn-info m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
 
-                        <button string="Non-Confidential Agenda" invisible="not article_exists"
+                        <button string="Non-Confidential Agenda" invisible="not article_exists or is_minutes_created"
                                 name="action_non_confidential_view_knowledge_article" type="object"
                                 class="btn btn-success m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -238,7 +239,7 @@
                         <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
 
-                        <button string="Reset Agenda" invisible="not article_exists"
+                        <button string="Reset Agenda" invisible="not article_exists or is_minutes_created"
                                 name="delete_article" type="object"
                                 class="btn btn-danger m-1" icon="fa-minus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
@@ -250,11 +251,12 @@
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_description_created" invisible="1"/>
+                    <field name="is_minutes_created" invisible="1"/>
                     <field name="action_visibility" widget="radio" options="{'horizontal': true}" class="mt-2"/>
 
                     <button name="action_create_agenda_descriptions" type="object" string="Generate minutes"
                             class="btn btn-warning m-1" icon="fa-external-link" confirm="Do you want to proceed ?"
-                            invisible="action_visibility == 'show'"
+                            invisible="is_minutes_created , action_visibility == 'show'"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <button name="action_open_documents_minutes"
@@ -298,20 +300,21 @@
                             confirm="Do you want to proceed ?" invisible="not has_attendees_added"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                    <button string="Confidential Minutes" invisible="not has_attendees_added"
+                    <button string="Confidential Minutes" invisible="not is_minutes_created"
                             name="action_view_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
+
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                    <button string="Non Confidential Minutes" invisible="not has_attendees_added"
+                    <button string="Non Confidential Minutes" invisible="not is_minutes_created"
                             name="action_view_alternate_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-<!--                    <button name="action_merge_minutes_documents"-->
-<!--                            string="publish Article"-->
-<!--                            type="object"-->
-<!--                            class="btn btn-danger"/>-->
+                    <!--                    <button name="action_merge_minutes_documents"-->
+                    <!--                            string="publish Article"-->
+                    <!--                            type="object"-->
+                    <!--                            class="btn btn-danger"/>-->
                 </page>
             </xpath>
         </field>

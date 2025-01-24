@@ -26,7 +26,7 @@
                             <div class="d-flex justify-content-end">
                                 <field name="is_minutes_of_meeting" invisible="1"/>
                                 <button name="publish_minutes" type="object"
-                                        string="Publish Minutes" class="btn btn-info m-2" icon="fa-paperclip" invisible="is_minutes_of_meeting"/>
+                                        string="Publish Minutes" class="btn btn-info m-2" icon="fa-paperclip" invisible="is_minutes_of_meeting" groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                             </div>
                         </div>
