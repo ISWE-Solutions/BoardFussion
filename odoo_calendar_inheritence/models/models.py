@@ -1309,17 +1309,11 @@ class OdooCalendarInheritence(models.Model):
             ('name', 'ilike', f"{self.name}_NonConfidential.pdf")
         ], limit=1)
 
-        # Check if user is Board Member or Board Secretary
-        is_board_member_or_secretary = self.env.user.has_group(
-            'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
-                                       self.env.user.has_group(
-                                           'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
-
-        # Determine accessible files
+        # Determine accessible files from the main event
         accessible_attachment_ids = []
         if non_confidential_attachment_id:
             accessible_attachment_ids.append(non_confidential_attachment_id.id)
-        if is_board_member_or_secretary and confidential_attachment_id:
+        if confidential_attachment_id:
             accessible_attachment_ids.append(confidential_attachment_id.id)
 
         # Log accessible attachments
@@ -1340,15 +1334,22 @@ class OdooCalendarInheritence(models.Model):
         _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
                      matching_documents.mapped('name'))
 
+        active_user = self.env.user.partner_id.id
+
         # Return action to open documents
         return {
             'type': 'ir.actions.act_window',
             'name': 'Documents',
             'res_model': 'product.document',
             'view_mode': 'kanban,tree,form',
-            'domain': [('id', 'in', matching_documents.ids)],
+            'domain': [
+                '&',
+                ('id', 'in', matching_documents.ids),
+                ('partner_ids', 'in', [active_user])
+            ],
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
+
 
     def action_open_minutes(self):
         self.ensure_one()
@@ -1366,27 +1367,17 @@ class OdooCalendarInheritence(models.Model):
             ('name', 'ilike', f"{self.name}_Minutes_NonConfidential.pdf")
         ], limit=1)
 
-        # Check if the user is a Board Member or Board Secretary
-        is_board_member_or_secretary = self.env.user.has_group(
-            'odoo_calendar_inheritence.group_agenda_meeting_board_member') or \
-                                       self.env.user.has_group(
-                                           'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
-
         # Determine accessible files from the main event
         accessible_attachment_ids = []
         if non_confidential_attachment_id:
             accessible_attachment_ids.append(non_confidential_attachment_id.id)
-        if is_board_member_or_secretary and confidential_attachment_id:
+        if confidential_attachment_id:
             accessible_attachment_ids.append(confidential_attachment_id.id)
 
         # Fetch uploaded attachments from related minutes lines
         minutes_lines = self.env['calendar.event.minutes.line'].search([('calendar_id', '=', self.id)])
         uploaded_attachment_ids = minutes_lines.mapped('pdf_attachment').ids
 
-        # Filter attachments based on restrictions
-        for line in minutes_lines:
-            if line.is_user_restricted:
-                uploaded_attachment_ids = list(set(uploaded_attachment_ids) - set(line.pdf_attachment.ids))
 
         # Combine attachments from both sources
         all_accessible_attachment_ids = list(set(accessible_attachment_ids + uploaded_attachment_ids))
@@ -1409,14 +1400,20 @@ class OdooCalendarInheritence(models.Model):
         _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
                      matching_documents.mapped('name'))
 
+        # Get active user partner ID
         active_user = self.env.user.partner_id.id
 
+        # Return action to open documents
         return {
             'type': 'ir.actions.act_window',
             'name': 'Documents',
             'res_model': 'product.document',
             'view_mode': 'kanban,tree,form',
-            'domain': [('id', 'in', matching_documents.ids)],
+            'domain': [
+                '&',
+                ('id', 'in', matching_documents.ids),
+                ('partner_ids', 'in', [active_user])
+            ],
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
 
