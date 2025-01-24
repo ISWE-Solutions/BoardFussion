@@ -1996,7 +1996,7 @@ class OdooCalendarInheritence(models.Model):
             _logger.info(f"PDF file successfully saved at: {pdf_file_path}")
         except subprocess.CalledProcessError as e:
             _logger.error(f"Failed to generate or save PDF file: {e}")
-            raise UserError(_("Failed to generate or save PDF file."))
+            # raise UserError(_("Failed to generate or save PDF file."))
         finally:
             # Clean up temporary HTML file
             if tmp_html_path:
