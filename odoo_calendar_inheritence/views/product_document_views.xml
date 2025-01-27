@@ -129,5 +129,44 @@
             </field>
         </record>
 
+        <!-- Add this record to your module's security file -->
+        <record id="product_document_create_restriction" model="ir.model.access">
+            <field name="name">product.document.create.restrict</field>
+            <field name="model_id" ref="model_product_document"/>
+            <field name="group_id" ref="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_read">1</field>
+        </record>
+
+        <record id="view_product_document_kanban_inherit" model="ir.ui.view">
+            <field name="name">product.document.kanban.inherit</field>
+            <field name="model">product.document</field>
+            <field name="inherit_id" ref="product.product_document_kanban"/>
+            <field name="arch" type="xml">
+                <!-- Modify the kanban-menu template -->
+                <xpath expr="//t[@t-name='kanban-menu']" position="replace">
+                    <t t-name="kanban-menu">
+                        <a t-if="widget.editable" type="edit" class="dropdown-item"
+                           groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary">Edit
+                        </a>
+                        <a t-if="widget.deletable" type="delete" class="dropdown-item"
+                           groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary">Delete
+                        </a>
+                        <a t-attf-href="/web/content/#{record.ir_attachment_id.raw_value}?download=true" download=""
+                           class="dropdown-item">Download
+                        </a>
+                    </t>
+                </xpath>
+
+                <!-- Set create conditionally based on group -->
+                <xpath expr="//kanban" position="attributes">
+                    <attribute name="create">false
+                    </attribute>
+                </xpath>
+            </field>
+        </record>
+
     </data>
 </odoo>

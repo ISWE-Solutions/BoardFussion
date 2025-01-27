@@ -97,7 +97,7 @@ class OdooCalendarInheritence(models.Model):
     minutes_document_ids = fields.Many2many(comodel_name='product.document', compute='_compute_minutes_documents',
                                             string='Product Documents')
     article_exists = fields.Boolean(compute='_compute_article_exists', store=False)
-    # bp_exists = fields.Boolean(compute='_compute_article_exists', store=False)
+    article_non_exists = fields.Boolean(compute='_compute_article_non_exists', store=False)
     article_id = fields.Many2one('knowledge.article', string='Related Article')
     non_confidential_article_id = fields.Many2one('knowledge.article', string='Related Article')
     description_article_id = fields.Many2one('knowledge.article', string='Related Description Article')
@@ -150,9 +150,15 @@ class OdooCalendarInheritence(models.Model):
         store=False,
         string="Employee Partners"
     )
-
-    is_minutes_created = fields.Boolean(string = "Are minutes Generated or Uploaded")
+    has_confidential_agenda_item = fields.Boolean(compute='_compute_has_confidential_agenda_item')
+    is_minutes_created = fields.Boolean(string = "Are minutes Generated")
+    is_minutes_uploaded = fields.Boolean(string="Are minutes Uploaded")
     is_boardpack_created = fields.Boolean(string="Are Boardpacks Generated")
+
+    @api.depends('product_line_ids.confidential')
+    def _compute_has_confidential_agenda_item(self):
+        for event in self:
+            event.has_confidential_agenda_item = any(line.confidential for line in event.product_line_ids)
 
     def _compute_employee_partner_ids(self):
         employees = self.env['hr.employee'].search([])
@@ -249,6 +255,12 @@ class OdooCalendarInheritence(models.Model):
         for record in self:
             record.article_exists = bool(record.article_id)
 
+    @api.depends('non_confidential_article_id')
+    def _compute_article_non_exists(self):
+        for record in self:
+            record.article_non_exists = bool(record.non_confidential_article_id)
+
+
     def _get_src_data_b64(self, value):
         try:  # FIXME: maaaaaybe it could also take raw bytes?
             image = Image.open(BytesIO(base64.b64decode(value)))
@@ -272,21 +284,9 @@ class OdooCalendarInheritence(models.Model):
             # Use consistent naming for the non-confidential article
             non_confidential_name = f"Non-Confidential Agenda: {self.name}"
             _logger.info("Searching for Non-Confidential Article with name: %s", non_confidential_name)
-
-            # Search for the non-confidential article
-            non_confidential_article = self.env['knowledge.article'].sudo().search([
-                ('name', '=', non_confidential_name)
-            ], limit=1)
-
-            if non_confidential_article:
-                _logger.info("Deleting Non-Confidential Article: %s", non_confidential_article.name)
-                non_confidential_article.unlink()
-            else:
-                _logger.warning("Non-Confidential Article not found: %s", non_confidential_name)
-
             # Delete the main article
             self.article_id.unlink()
-
+            self.non_confidential_article_id.unlink()
             # Clear references on the agenda record
             self.article_id = False
             self.last_write_count = 0
@@ -525,22 +525,23 @@ class OdooCalendarInheritence(models.Model):
         })
         self.article_id = article.id
 
-        non_confidential_body = base_content.format(
-            confidential_header="",
-            description_content=description_content,
-            board_attendees_content=board_attendees_content,
-            regular_attendees_content=regular_attendees_content,
-            agenda_content=non_confidential_agenda,
-            **shared_vars
-        )
-        non_conf_cp = self.env['knowledge.article'].sudo().create({
-            'name': f"Non-Confidential Agenda: {self.name}",
-            'body': non_confidential_body,
-            'calendar_id': self.id,
-            'non_conf_cover_page': f"{article.id}-Non"
-        })
-
-        self.non_conf_cover_page = f"{article.id}-Non"
+        if self.has_confidential_agenda_item :
+            non_confidential_body = base_content.format(
+                confidential_header="",
+                description_content=description_content,
+                board_attendees_content=board_attendees_content,
+                regular_attendees_content=regular_attendees_content,
+                agenda_content=non_confidential_agenda,
+                **shared_vars
+            )
+            non_conf_article = self.env['knowledge.article'].sudo().create({
+                'name': f"Non-Confidential Agenda: {self.name}",
+                'body': non_confidential_body,
+                'calendar_id': self.id,
+            })
+            self.non_confidential_article_id = non_conf_article.id
+        else:
+            self.non_confidential_article_id = False
 
     def update_attendees_in_article(self):
         """
@@ -925,8 +926,8 @@ class OdooCalendarInheritence(models.Model):
         self.action_delete_agenda_descriptions()
 
         # Initialize attendee lists
-        attendees_present = []  # For board members and board secretary
-        attendees_in_attendance = []  # For other attendees
+        attendees_present = []
+        attendees_in_attendance = []
 
         if not self.attendees_lines_ids:
             raise UserError(_('Kindly, add the attendees!'))
@@ -945,11 +946,11 @@ class OdooCalendarInheritence(models.Model):
                 return ""
             section = f"""
             <div class="table-responsive my-3" style="border:none;">
-                <table class="table" style="table-layout: fixed; width: 100%; border: none; border-collapse: collapse;">
+                <table class="table" style="table-layout: fixed; width: 100%; border-bottom: 1px solid black; border-collapse: collapse;">
                     <colgroup style="border:none;">
-                        <col style="width: 10%;" /> <!-- Title column -->
+                        <col style="width: 20%;" /> <!-- Title column -->
                         <col style="width: 5%;" />  <!-- Colon column -->
-                        <col style="width: 85%;" /> <!-- Attendees column -->
+                        <col style="width: 75%;" /> <!-- Attendees column -->
                     </colgroup>
                     <tbody style="border:none;">
                         <tr style="border:none;">
@@ -1039,15 +1040,16 @@ class OdooCalendarInheritence(models.Model):
         }
         original_article = self.env['knowledge.article'].sudo().create(original_article_values)
         self.description_article_id = original_article
-
-        # Create alternate article
-        alternate_article_values = {
-            'name': f"Minutes: {self.name} (Non-Confidential)",
-            'body': alternate_body_content,
-            'calendar_id': self.id,
-        }
-        alternate_article = self.env['knowledge.article'].sudo().create(alternate_article_values)
-        self.alternate_description_article_id = alternate_article
+        if self.has_confidential_agenda_item:
+            alternate_article_values = {
+                'name': f"Minutes: {self.name} (Non-Confidential)",
+                'body': alternate_body_content,
+                'calendar_id': self.id,
+            }
+            alternate_article = self.env['knowledge.article'].sudo().create(alternate_article_values)
+            self.alternate_description_article_id = alternate_article
+        else:
+            self.alternate_description_article_id = False
 
         self.is_description_created = True
         self.is_minutes_created = True
@@ -1067,35 +1069,19 @@ class OdooCalendarInheritence(models.Model):
                 }
 
     def action_non_confidential_view_knowledge_article(self):
+
         self.ensure_one()
+        for record in self:
+            if record.non_confidential_article_id:
+                return {
+                    'type': 'ir.actions.act_window',
+                    'name': 'Knowledge Article',
+                    'res_model': 'knowledge.article',
+                    'view_mode': 'form',
+                    'res_id': record.non_confidential_article_id.id,
+                    'target': 'current',
+                }
 
-        if not self.article_id:
-            raise ValidationError("No associated article found!")
-
-        # Define the name of the article to find (or use other criteria)
-        non_confidential_name = f"Non-Confidential Agenda: {self.name}"
-        _logger.info(f"Searching for Knowledge Article: {non_confidential_name}")
-
-        # Search for the exact article
-        non_confidential_article = self.env['knowledge.article'].sudo().search([
-            ('name', '=', non_confidential_name)
-        ], limit=1)
-
-        if not non_confidential_article:
-            raise ValidationError(f"No knowledge article found with the name '{non_confidential_name}'")
-
-        # Log the found article and its ID
-        _logger.info(f"Opening Knowledge Article: {non_confidential_article.name} (ID: {non_confidential_article.id})")
-
-        # Return an action to open the form view of the found article
-        return {
-            'type': 'ir.actions.act_window',
-            'name': 'Knowledge Article',
-            'res_model': 'knowledge.article',
-            'view_mode': 'form',
-            'res_id': non_confidential_article.id,  # Open the specific article
-            'target': 'current',
-        }
 
     def action_view_description_article(self):
         self.ensure_one()
@@ -1211,6 +1197,7 @@ class OdooCalendarInheritence(models.Model):
             rec.has_attendees_added = False
             rec.has_attendees_confirmed = False
             rec.is_minutes_created = False
+            rec.is_minutes_uploaded = False
             rec.description_article_id.sudo().unlink()
             rec.action_delete_agenda_descriptions()
 
@@ -2113,55 +2100,56 @@ class OdooCalendarInheritence(models.Model):
         # Generate the confidential and non-confidential cover HTML and save as PDFs
         company_logo_base64 = self.env.company.logo or None
         confidential_article_body = self.article_id.body if self.article_id else None
-
-        non_conf_article = self.env['knowledge.article'].search(
-            [('non_conf_cover_page', '=', self.non_conf_cover_page)], limit=1)
-        non_conf_article_body = non_conf_article.body if non_conf_article else None
+        non_conf_article_body = self.non_confidential_article_id.body if self.non_confidential_article_id else None
 
         if not confidential_article_body:
             raise UserError(_("No article found for confidential cover page."))
-        if not non_conf_article_body:
-            raise UserError(_("No article found for non-confidential cover page."))
 
-        # Generate cover pages
+        # Generate confidential cover page
         self._generate_cover_html(company_logo_base64, confidential_article_body, is_confidential=True)
-        self._generate_cover_html(company_logo_base64, non_conf_article_body, is_confidential=False)
-
-        # Paths to the generated cover files
         confidential_cover_path = '/opt/confidential_cover.pdf'
-        non_confidential_cover_path = '/opt/non_confidential_cover.pdf'
 
-        # Step 3: Classify attachments
+        # Generate non-confidential cover page if non_conf_article_body exists
+        non_confidential_cover_path = None
+        if non_conf_article_body:
+            self._generate_cover_html(company_logo_base64, non_conf_article_body, is_confidential=False)
+            non_confidential_cover_path = '/opt/non_confidential_cover.pdf'
+
+        # Classify attachments
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
 
         if not confidential_attachments and not non_confidential_attachments:
             _logger.warning("No attachments found to merge.")
             return {}
 
-        # Step 4: Merge files
+        # Merge files
+        saved_documents = {}
+
         # For Confidential: Merge cover page with all attachments
-        confidential_stream = self._merge_attachments(
-            confidential_cover_path, confidential_attachments + non_confidential_attachments
-        )
-
-        # For Non-Confidential: Merge cover page with only non-confidential attachments
-        non_confidential_stream = self._merge_attachments(
-            non_confidential_cover_path, non_confidential_attachments
-        )
-
-        # Step 5: Save the documents
-        saved_documents = {
-            "Confidential": self.save_merged_document(
+        if confidential_attachments or non_confidential_attachments:
+            confidential_stream = self._merge_attachments(
+                confidential_cover_path, confidential_attachments + non_confidential_attachments
+            )
+            saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
                 filename_suffix="_Confidential.pdf",
                 description=f"Confidential document for event {self.name}"
-            ),
-            "NonConfidential": self.save_merged_document(
+            )
+
+        # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
+        if non_conf_article_body and non_confidential_attachments:
+            non_confidential_stream = self._merge_attachments(
+                non_confidential_cover_path, non_confidential_attachments
+            )
+            saved_documents["NonConfidential"] = self.save_merged_document(
                 non_confidential_stream,
                 filename_suffix="_NonConfidential.pdf",
                 description=f"Non-confidential document for event {self.name}"
-            ),
-        }
+            )
+        elif not non_conf_article_body:
+            _logger.info("Skipping non-confidential document generation: no article body.")
+        elif not non_confidential_attachments:
+            _logger.info("Skipping non-confidential document generation: no non-confidential attachments.")
 
         # Log details of saved documents
         _logger.info("Number of files saved: %d", len(saved_documents))
@@ -2171,7 +2159,7 @@ class OdooCalendarInheritence(models.Model):
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
 
-        # Step 6: Determine user access level
+        # Determine user access level
         user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
                           self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
         self.is_board_park = True
@@ -2198,16 +2186,16 @@ class OdooCalendarInheritence(models.Model):
 
         if not confidential_minutes_article_body:
             raise UserError(_("No article found for confidential minutes cover page."))
-        if not non_conf_minutes_article_body:
-            raise UserError(_("No article found for non-confidential minutes cover page."))
 
-        # Generate cover pages
+        # Generate confidential cover page
         self._generate_minutes_cover_html(company_logo_base64, confidential_minutes_article_body, is_confidential=True)
-        self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
-
-        # Paths to the generated cover files
         confidential_cover_path = '/opt/confidential_minutes_cover.pdf'
-        non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
+
+        # Generate non-confidential cover page if non_conf_minutes_article_body exists
+        non_confidential_cover_path = None
+        if non_conf_minutes_article_body:
+            self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
+            non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
 
         # Classify attachments for minutes
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
@@ -2217,29 +2205,34 @@ class OdooCalendarInheritence(models.Model):
             return {}
 
         # Merge files
+        saved_documents = {}
+
         # For Confidential: Merge cover page with all attachments
-        confidential_stream = self._merge_attachments(
-            confidential_cover_path, confidential_attachments + non_confidential_attachments
-        )
-
-        # For Non-Confidential: Merge cover page with only non-confidential attachments
-        non_confidential_stream = self._merge_attachments(
-            non_confidential_cover_path, non_confidential_attachments
-        )
-
-        # Save the documents
-        saved_documents = {
-            "Confidential": self.save_merged_document(
+        if confidential_attachments or non_confidential_attachments:
+            confidential_stream = self._merge_attachments(
+                confidential_cover_path, confidential_attachments + non_confidential_attachments
+            )
+            saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
                 filename_suffix="_Minutes_Confidential.pdf",
                 description=f"Confidential minutes for event {self.name}"
-            ),
-            "NonConfidential": self.save_merged_document(
-                non_confidential_stream,
-                filename_suffix="_Minutes_NonConfidential.pdf",
-                description=f"Non-confidential minutes for event {self.name}"
-            ),
-        }
+            )
+
+        # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
+        if non_confidential_cover_path:
+            if non_confidential_attachments:
+                non_confidential_stream = self._merge_attachments(
+                    non_confidential_cover_path, non_confidential_attachments
+                )
+                saved_documents["NonConfidential"] = self.save_merged_document(
+                    non_confidential_stream,
+                    filename_suffix="_Minutes_NonConfidential.pdf",
+                    description=f"Non-confidential minutes for event {self.name}"
+                )
+            else:
+                _logger.info("Skipping non-confidential minutes document generation: no non-confidential attachments.")
+        else:
+            _logger.info("Skipping non-confidential minutes document generation: no article body.")
 
         # Log details of saved documents
         _logger.info("Number of minutes files saved: %d", len(saved_documents))

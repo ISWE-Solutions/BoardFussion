@@ -57,6 +57,19 @@ class CalendarEventProductLine(models.Model):
         store=False,
     )
 
+
+    @api.onchange('description')
+    def _onchange_description_attachment(self):
+        """
+        Trigger an update on the parent calendar.event when a new attachment is added or modified.
+        """
+        for record in self:
+            if record.calendar_id:
+                record.calendar_id.write({
+                    'last_write_date': fields.Datetime.now()  # You can update any field here as needed
+                })
+
+
     @api.depends('calendar_id')
     def _compute_presenter_domain_ids(self):
         for record in self:
@@ -182,10 +195,11 @@ class CalendarEventProductLine(models.Model):
             # Handle Restricted and partner_ids synchronization on create
 
             # Recalculate visible users after document creation
-            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
-            if record.calendar_id:
-                _logger.info(f"Triggering write on calendar.event ID: {record.calendar_id.id}")
-                record.calendar_id.write({'last_write_date': fields.Datetime.now()})
+            # if record.calendar_id:
+            #     record.calendar_id.write({
+            #         'last_write_date': fields.Datetime.now()  # You can update any field here as needed
+            #     })
+
 
         return rtn
 

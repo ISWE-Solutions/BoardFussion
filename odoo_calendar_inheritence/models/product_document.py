@@ -24,6 +24,17 @@ class ProductDocument(models.Model):
     is_pdf = fields.Boolean(string='Is PDF Document', compute='_compute_is_pdf_document')
     partner_ids = fields.Many2many('res.partner', string="Document visible to:")
 
+    # is_board_secretary = fields.Boolean(compute='_compute_is_board_secretary')
+    is_board_secretary = fields.Boolean(store="True", default="True")
+
+    @api.depends_context('uid')
+    def _compute_is_board_secretary(self):
+        _logger.info('Computing is_board_secretary for user %s', self.env.user.name)
+        user = self.env.user
+        group_ids = user.groups_id.ids
+        secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary').id
+        self.user_is_board_member_or_secretary = (secretary_group in group_ids)
+
     def _onchange_partner_ids(self):
         """
         Ensure changes to `partner_ids` are reflected in `Restricted` of related `calendar.event.product.line` records.
