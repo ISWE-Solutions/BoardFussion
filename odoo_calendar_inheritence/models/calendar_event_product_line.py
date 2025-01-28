@@ -28,6 +28,8 @@ class CalendarEventProductLine(models.Model):
         store=True,
     )
 
+    is_minutes_created = fields.Boolean(default="false")
+
     duration = fields.Float(string="Duration")
     start_date = fields.Datetime(string='Start Date', default=lambda self: fields.Datetime.now())
     end_date = fields.Datetime(string='End Date')
@@ -192,14 +194,10 @@ class CalendarEventProductLine(models.Model):
                     })
                     _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
-            # Handle Restricted and partner_ids synchronization on create
-
-            # Recalculate visible users after document creation
-            # if record.calendar_id:
-            #     record.calendar_id.write({
-            #         'last_write_date': fields.Datetime.now()  # You can update any field here as needed
-            #     })
-
+                    # Call the `delete_article` method from the related calendar
+            if record.calendar_id and hasattr(record.calendar_id, 'delete_article'):
+                _logger.info(f"Calling delete_article for Calendar Event {record.calendar_id.id}")
+                record.calendar_id.delete_article()
 
         return rtn
 

@@ -92,7 +92,6 @@
                 <!--                <field name="is_user_restricted" invisible="1"/>-->
                 <button class="oe_stat_button" name="action_open_documents" string="All Documents" type="object"
                         icon="fa-file-text-o">
-
                 </button>
 
                 <button
@@ -183,13 +182,15 @@
                     </field>
                 </page>
             </xpath>
+
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
-                        <tree>
+                        <tree create="is_minutes_created">
                             <control>
-                                <create string="Add Agenda"/>
+                                <create string="Add Agenda"
+                                        groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                             </control>
                             <field name="sequence" widget="handle"/>
                             <field name="agenda" column_invisible="True"/>
@@ -315,7 +316,6 @@
                     <button string="Confidential Minutes" invisible="not is_minutes_created or is_minutes_uploaded"
                             name="action_view_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
-
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <button string="Non Confidential Minutes"
@@ -334,6 +334,7 @@
             </xpath>
         </field>
     </record>
+
 
     <record id="calendar_event_product_line_form_view_extended" model="ir.ui.view">
         <field name="name">calendar.event.product.line.form.view.extended</field>
@@ -359,16 +360,16 @@
             <xpath expr="//button[@name='clear_videocall_location']" position="attributes">
                 <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
             </xpath>
-
-            <!-- Add groups to the 'EMAIL' button -->
             <xpath expr="//button[@name='action_open_composer']" position="attributes">
                 <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
             </xpath>
+            <xpath expr="//div[@class='oe_chatter']" position="replace"/>
 
-            <!-- Remove attachment paper clip option -->
-            <xpath expr="//div[@class='oe_chatter']" position="attributes">
-                  <attribute name="disable_attachment_box">1</attribute>
+            <xpath expr="//field[@name='partner_ids']" position="attributes">
+                 <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
+                 <attribute name="readonly" eval="not has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')"/>
             </xpath>
+
         </field>
     </record>
 
