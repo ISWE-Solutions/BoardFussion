@@ -36,7 +36,7 @@ class CalendarEventProductLine(models.Model):
     description = fields.Html(string='Description')
     time = fields.Char(string='Time')
     pdf_attachment = fields.Many2many('ir.attachment', string='Add Attachments')
-    calendar_id = fields.Many2one('calendar.event', string="Calendar Event", required=True)
+    calendar_id = fields.Many2one('calendar.event', string="Calendar Event", required=False)
 
     Restricted = fields.Many2many(
         'res.partner',
@@ -59,7 +59,6 @@ class CalendarEventProductLine(models.Model):
         store=False,
     )
 
-
     @api.onchange('description')
     def _onchange_description_attachment(self):
         """
@@ -71,6 +70,10 @@ class CalendarEventProductLine(models.Model):
                     'last_write_date': fields.Datetime.now()  # You can update any field here as needed
                 })
 
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
 
     @api.depends('calendar_id')
     def _compute_presenter_domain_ids(self):
@@ -162,29 +165,98 @@ class CalendarEventProductLine(models.Model):
     @api.model_create_multi
     def create(self, values):
         rtn = super(CalendarEventProductLine, self).create(values)
+        for record in rtn:
+            record._process_product_line_creation()
+        return rtn
+
+    def _process_product_line_creation(self):
         document_model = self.env['product.document']
 
-        for record in rtn:
-            record.product_id = record.calendar_id.product_id.id
-            product = record.product_id
+        self.product_id = self.calendar_id.product_id.id
+        product = self.product_id
 
-            # Ensure product_document_id is set
-            if not record.product_document_id:
+        # Ensure product_document_id is set
+        if not self.product_document_id:
+            new_document = document_model.sudo().create({
+                'res_model': 'product.template',
+                'name': product.display_name,
+                'res_id': product.id,
+            })
+            self.product_document_id = new_document.id
+            _logger.info(
+                f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {self.id}")
+
+        # Process PDF attachments
+        if self.pdf_attachment:
+            for attachment in self.pdf_attachment:
+                _logger.info(f"Processing attachment: {attachment.name}")
+                restricted_partner_ids = list(set(self.Restricted.ids))
+
+                # Create new document for each attachment
                 new_document = document_model.sudo().create({
                     'res_model': 'product.template',
-                    'name': product.display_name,
+                    'name': attachment.name,
                     'res_id': product.id,
+                    'ir_attachment_id': attachment.id,
+                    'partner_ids': [(6, 0, restricted_partner_ids)]
                 })
-                record.product_document_id = new_document.id
-                _logger.info(
-                    f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {record.id}")
+                _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
-            # Process PDF attachments
-            if record.pdf_attachment:
-                for attachment in record.pdf_attachment:
-                    _logger.info(f"Processing attachment: {attachment.name}")
-                    restricted_partner_ids = list(set(record.Restricted.ids))
-                    # Create new document for each attachment
+        # Call the `delete_article` method from the related calendar
+        if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
+            _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
+            self.calendar_id.delete_article()
+
+        if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
+            _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
+            self.calendar_id.reload_func()
+
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
+
+    @api.model
+    def write(self, values):
+        res = super(CalendarEventProductLine, self).write(values)
+        for record in self:
+            record.process_product_document_updates(values)
+        return res
+
+    def process_product_document_updates(self, values):
+        document_model = self.env['product.document']
+
+        # Update product_id if calendar_id changes
+        if 'calendar_id' in values:
+            self.product_id = self.calendar_id.product_id.id
+
+        product = self.product_id
+
+        # Ensure product_document_id is set
+        if 'product_document_id' not in values and not self.product_document_id:
+            new_document = document_model.sudo().create({
+                'res_model': 'product.template',
+                'name': product.display_name,
+                'res_id': product.id,
+            })
+            self.product_document_id = new_document.id
+            _logger.info(
+                f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {self.id}")
+
+        # Process PDF attachments
+        if 'pdf_attachment' in values:
+            existing_documents = document_model.sudo().search([
+                ('ir_attachment_id', 'in', self.pdf_attachment.ids)
+            ])
+            for attachment in self.pdf_attachment:
+                if not existing_documents.filtered(lambda doc: doc.ir_attachment_id.id == attachment.id):
+                    if not attachment.name:
+                        _logger.error(f"Skipping attachment with missing name: {attachment.id}")
+                        continue  # Skip attachments without names
+                    _logger.info(f"Processing new attachment: {attachment.name}")
+                    restricted_partner_ids = list(set(self.Restricted.ids))
+
                     new_document = document_model.sudo().create({
                         'res_model': 'product.template',
                         'name': attachment.name,
@@ -192,68 +264,20 @@ class CalendarEventProductLine(models.Model):
                         'ir_attachment_id': attachment.id,
                         'partner_ids': [(6, 0, restricted_partner_ids)]
                     })
+
                     _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
-                    # Call the `delete_article` method from the related calendar
-            if record.calendar_id and hasattr(record.calendar_id, 'delete_article'):
-                _logger.info(f"Calling delete_article for Calendar Event {record.calendar_id.id}")
-                record.calendar_id.delete_article()
+        # Handle Restricted and partner_ids synchronization on update
+        if 'Restricted' in values:
+            restricted_partner_ids = list(set(self.Restricted.ids))
+            for document in document_model.sudo().search([
+                ('ir_attachment_id', 'in', self.pdf_attachment.ids)
+            ]):
+                document.partner_ids = [(6, 0, restricted_partner_ids)]
+            _logger.info(f"Updated partner_ids for product documents linked to product {product.id}")
 
-        return rtn
-
-    @api.model
-    def write(self, values):
-        res = super(CalendarEventProductLine, self).write(values)
-        document_model = self.env['product.document']
-
-        for record in self:
-            # Update product_id if calendar_id changes
-            if 'calendar_id' in values:
-                record.product_id = record.calendar_id.product_id.id
-
-            product = record.product_id
-
-            # Ensure product_document_id is set
-            if 'product_document_id' not in values and not record.product_document_id:
-                new_document = document_model.sudo().create({
-                    'res_model': 'product.template',
-                    'name': product.display_name,
-                    'res_id': product.id,
-                })
-                record.product_document_id = new_document.id
-                _logger.info(
-                    f"Assigned product_document_id {new_document.id} to Calendar Event Product Line {record.id}")
-
-            # Process PDF attachments
-            if 'pdf_attachment' in values:
-                existing_documents = document_model.sudo().search( [('ir_attachment_id', 'in', record.pdf_attachment.ids)])
-                attachment_ids = record.pdf_attachment.ids
-                for attachment in record.pdf_attachment:
-                    if not existing_documents.filtered(lambda doc: doc.ir_attachment_id.id == attachment.id):
-                        _logger.info(f"Processing new attachment: {attachment.name}")
-                        restricted_partner_ids = list(set(record.Restricted.ids))
-                        # Create new document for each attachment
-                        new_document = document_model.sudo().create({
-                            'res_model': 'product.template',
-                            'name': attachment.name,
-                            'res_id': product.id,
-                            'ir_attachment_id': attachment.id,
-                            'partner_ids': [(6, 0, restricted_partner_ids)]
-                        })
-                        _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
-
-            # Handle Restricted and partner_ids synchronization on update
-            if 'Restricted' in values:
-                restricted_partner_ids = list(set(record.Restricted.ids))
-                # Update partner_ids for related documents
-                for document in document_model.sudo().search([('ir_attachment_id', 'in', record.pdf_attachment.ids)]):
-                    document.partner_ids = [(6, 0, restricted_partner_ids)]
-                _logger.info(f"Updated partner_ids for product documents linked to product {product.id}")
-
-            # Recalculate visible users after updates
-            record.calendar_id.compute_visible_users(product_document_ids=record.product_document_id)
-
-        return res
+        # Recalculate visible users after updates
+        self.calendar_id.compute_visible_users(product_document_ids=self.product_document_id)
 
     def unlink(self):
         unlink_list_ids = []

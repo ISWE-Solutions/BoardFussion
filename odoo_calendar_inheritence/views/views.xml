@@ -100,12 +100,11 @@
                         name="action_open_boardpack"
                         icon="fa-external-link"
                         string="View Board Pack"
-                        confirm="Do you want to proceed ?"
                         invisible="not is_board_park"
                 />
                 <button class="oe_stat_button" name="action_open_minutes" type="object"
                         string="View minutes"
-                        icon="fa-external-link" confirm="Do you want to proceed ?"
+                        icon="fa-external-link"
                         invisible="not is_minutes_created">
                 </button>
                 <button class="oe_stat_button" type="action" name="%(odoo_calendar_inheritence.action_attendees_lines)d"
@@ -186,8 +185,10 @@
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
-                           context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
-                        <tree create="is_minutes_created">
+                           context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}"
+                           options="{'no_create': False, 'reload_on_save': True}" >
+
+                        <tree >
                             <control>
                                 <create string="Add Agenda"
                                         groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -285,9 +286,8 @@
                             string="Upload Non-Confidential Minutes"
                             class="btn btn-grey"
                             icon="fa-paperclip"
-                            confirm="Do you want to proceed?"
                             context="{'default_confidential': False}"
-                            invisible="action_visibility == 'hide' or is_minutes_created"
+                            invisible="action_visibility == 'hide' or is_minutes_created or not article_non_exists"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <group string="Meeting Attendees">
@@ -366,8 +366,9 @@
             <xpath expr="//div[@class='oe_chatter']" position="replace"/>
 
             <xpath expr="//field[@name='partner_ids']" position="attributes">
-                 <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
-                 <attribute name="readonly" eval="not has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')"/>
+                <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
+                <attribute name="readonly"
+                           eval="not has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')"/>
             </xpath>
 
         </field>

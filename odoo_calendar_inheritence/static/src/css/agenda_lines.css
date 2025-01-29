@@ -28,3 +28,8 @@
 .o_form_view .o_form_sheet_bg {
     max-width: none !important;
 }
+
+
+.o_calendar_view button[data-string="Add Agenda"] {
+    display: none !important;
+}

@@ -67,6 +67,7 @@ Long description of module's purpose
             'odoo_calendar_inheritence/static/src/js/custom_confirm.js',
             # 'odoo_calendar_inheritence/static/src/xml/merge_preview.xml',
             'odoo_calendar_inheritence/static/src/js/calendar_event_restriction.js',
+            'odoo_calendar_inheritence/static/src/js/reloading_calendar.js',
             'odoo_calendar_inheritence/static/src/js/action_board_knowledge',
             'odoo_calendar_inheritence/static/src/css/agenda_lines.css',
         ],

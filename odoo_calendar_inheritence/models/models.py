@@ -191,6 +191,7 @@ class OdooCalendarInheritence(models.Model):
             else:
                 rec.mom_lines_count = 0
 
+
     # def _compute_mom_count(self):
     #     pass
 
@@ -275,8 +276,8 @@ class OdooCalendarInheritence(models.Model):
 
     def delete_article(self):
         """ Deletes the linked article and its non-confidential copy if they exist. """
-        if not self.article_id:
-            raise ValidationError("No associated article found to delete!")
+        # if not self.article_id:
+        #     raise ValidationError("No associated article found to delete!")
 
         _logger.info("Deleting Article: %s", self.article_id.name)
 
@@ -293,10 +294,18 @@ class OdooCalendarInheritence(models.Model):
             self.last_write_date = fields.Datetime.now()
 
             _logger.info("Articles successfully deleted.")
+            self.remove_confidential_attachments()
             self.is_board_park = False
+
         except Exception as e:
             _logger.error("Error deleting articles: %s", str(e))
             raise ValidationError(f"An error occurred while deleting the articles: {str(e)}")
+
+    def reload_func(self):
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
 
     def remove_attendees_from_article(self):
         """
@@ -1082,7 +1091,6 @@ class OdooCalendarInheritence(models.Model):
                     'target': 'current',
                 }
 
-
     def action_view_description_article(self):
         self.ensure_one()
         if self.description_article_id:
@@ -1819,6 +1827,35 @@ class OdooCalendarInheritence(models.Model):
                          merged_attachment.name, list(set(new_partner_ids)))
 
         return merged_attachment
+
+    def remove_confidential_attachments(self):
+        """
+        Check and remove existing attachments for the `calendar.event`
+        with filenames containing `_NonConfidential` or `_Confidential`.
+        """
+        self.ensure_one()
+
+        # Search for attachments with the specified prefixes
+        domain = [
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            '|',
+            ('name', 'ilike', '_NonConfidential'),
+            ('name', 'ilike', '_Confidential'),
+        ]
+
+        existing_attachments = self.env['ir.attachment'].search(domain)
+
+        if existing_attachments:
+            # Log the names of attachments being removed
+            for attachment in existing_attachments:
+                _logger.info("Removing existing attachment: %s", attachment.name)
+
+            # Remove the attachments
+            existing_attachments.unlink()
+            _logger.info("Removed %d attachment(s) for calendar.event '%s'.", len(existing_attachments), self.name)
+        else:
+            _logger.info("No confidential or non-confidential attachments found for calendar.event '%s'.", self.name)
 
     def add_watermark_to_pdf(self, page):
         """
