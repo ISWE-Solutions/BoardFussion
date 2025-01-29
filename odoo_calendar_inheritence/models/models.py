@@ -12,7 +12,7 @@ from io import BytesIO
 from markupsafe import Markup, escape
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 from reportlab.lib.randomtext import subjects
-
+from lxml import etree
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
 from docx import Document
@@ -154,6 +154,21 @@ class OdooCalendarInheritence(models.Model):
     is_minutes_created = fields.Boolean(string = "Are minutes Generated")
     is_minutes_uploaded = fields.Boolean(string="Are minutes Uploaded")
     is_boardpack_created = fields.Boolean(string="Are Boardpacks Generated")
+    create_text= fields.Char(string="true or false",  default="False")
+
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        res = super(OdooCalendarInheritence, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,
+                                                         submenu=submenu)
+        if view_type == 'form' and res.get('fields', {}).get('product_line_ids'):
+            doc = etree.XML(res['arch'])
+            for node in doc.xpath("//field[@name='product_line_ids']"):
+                if self.env.context.get('default_is_boardpack_created'):
+                    node.set('create', 'false')
+                else:
+                    node.set('create', 'true')
+            res['arch'] = etree.tostring(doc, encoding='unicode')
+        return res
 
     @api.depends('product_line_ids.confidential')
     def _compute_has_confidential_agenda_item(self):
@@ -2155,15 +2170,11 @@ class OdooCalendarInheritence(models.Model):
         # Classify attachments
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
 
-        if not confidential_attachments and not non_confidential_attachments:
-            _logger.warning("No attachments found to merge.")
-            return {}
-
-        # Merge files
         saved_documents = {}
 
         # For Confidential: Merge cover page with all attachments
-        if confidential_attachments or non_confidential_attachments:
+        if confidential_attachments or non_confidential_attachments or not (
+                confidential_attachments and non_confidential_attachments):
             confidential_stream = self._merge_attachments(
                 confidential_cover_path, confidential_attachments + non_confidential_attachments
             )
@@ -2174,19 +2185,24 @@ class OdooCalendarInheritence(models.Model):
             )
 
         # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
-        if non_conf_article_body and non_confidential_attachments:
-            non_confidential_stream = self._merge_attachments(
-                non_confidential_cover_path, non_confidential_attachments
-            )
-            saved_documents["NonConfidential"] = self.save_merged_document(
-                non_confidential_stream,
-                filename_suffix="_NonConfidential.pdf",
-                description=f"Non-confidential document for event {self.name}"
-            )
-        elif not non_conf_article_body:
-            _logger.info("Skipping non-confidential document generation: no article body.")
-        elif not non_confidential_attachments:
-            _logger.info("Skipping non-confidential document generation: no non-confidential attachments.")
+        if non_confidential_cover_path:
+            if non_confidential_attachments:
+                non_confidential_stream = self._merge_attachments(
+                    non_confidential_cover_path, non_confidential_attachments
+                )
+                saved_documents["NonConfidential"] = self.save_merged_document(
+                    non_confidential_stream,
+                    filename_suffix="_NonConfidential.pdf",
+                    description=f"Non-confidential document for event {self.name}"
+                )
+            else:
+                # Save the non-confidential cover page even if there are no attachments
+                non_confidential_stream = open(non_confidential_cover_path, 'rb')
+                saved_documents["NonConfidential"] = self.save_merged_document(
+                    non_confidential_stream,
+                    filename_suffix="_NonConfidential.pdf",
+                    description=f"Non-confidential document for event {self.name}"
+                )
 
         # Log details of saved documents
         _logger.info("Number of files saved: %d", len(saved_documents))
@@ -2237,15 +2253,11 @@ class OdooCalendarInheritence(models.Model):
         # Classify attachments for minutes
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
 
-        if not confidential_attachments and not non_confidential_attachments:
-            _logger.warning("No attachments found to merge for minutes.")
-            return {}
-
-        # Merge files
         saved_documents = {}
 
         # For Confidential: Merge cover page with all attachments
-        if confidential_attachments or non_confidential_attachments:
+        if confidential_attachments or non_confidential_attachments or not (
+                confidential_attachments and non_confidential_attachments):
             confidential_stream = self._merge_attachments(
                 confidential_cover_path, confidential_attachments + non_confidential_attachments
             )
@@ -2267,9 +2279,13 @@ class OdooCalendarInheritence(models.Model):
                     description=f"Non-confidential minutes for event {self.name}"
                 )
             else:
-                _logger.info("Skipping non-confidential minutes document generation: no non-confidential attachments.")
-        else:
-            _logger.info("Skipping non-confidential minutes document generation: no article body.")
+                # Save the non-confidential cover page even if there are no attachments
+                non_confidential_stream = open(non_confidential_cover_path, 'rb')
+                saved_documents["NonConfidential"] = self.save_merged_document(
+                    non_confidential_stream,
+                    filename_suffix="_Minutes_NonConfidential.pdf",
+                    description=f"Non-confidential minutes for event {self.name}"
+                )
 
         # Log details of saved documents
         _logger.info("Number of minutes files saved: %d", len(saved_documents))
@@ -2285,6 +2301,88 @@ class OdooCalendarInheritence(models.Model):
 
         # Explicitly return the action or any additional UI updates as needed
         return self.action_open_minutes()
+
+
+    # def action_merge_minutes_documents(self):
+    #     """
+    #     Merge attachments into two distinct documents for meeting minutes:
+    #     Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
+    #     Stream the appropriate document based on user roles.
+    #     """
+    #     self.ensure_one()
+    #
+    #     # Generate the confidential and non-confidential cover HTML and save as PDFs
+    #     company_logo_base64 = self.env.company.logo or None
+    #     confidential_minutes_article_body = self.description_article_id.body if self.description_article_id else None
+    #
+    #     non_conf_minutes_article = self.env['knowledge.article'].search(
+    #         [('id', '=', self.alternate_description_article_id.id)], limit=1)
+    #     non_conf_minutes_article_body = non_conf_minutes_article.body if non_conf_minutes_article else None
+    #
+    #     if not confidential_minutes_article_body:
+    #         raise UserError(_("No article found for confidential minutes cover page."))
+    #
+    #     # Generate confidential cover page
+    #     self._generate_minutes_cover_html(company_logo_base64, confidential_minutes_article_body, is_confidential=True)
+    #     confidential_cover_path = '/opt/confidential_minutes_cover.pdf'
+    #
+    #     # Generate non-confidential cover page if non_conf_minutes_article_body exists
+    #     non_confidential_cover_path = None
+    #     if non_conf_minutes_article_body:
+    #         self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
+    #         non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
+    #
+    #     # Classify attachments for minutes
+    #     confidential_attachments, non_confidential_attachments = self._classify_attachments()
+    #
+    #     if not confidential_attachments and not non_confidential_attachments:
+    #         _logger.warning("No attachments found to merge for minutes.")
+    #         return {}
+    #
+    #     # Merge files
+    #     saved_documents = {}
+    #
+    #     # For Confidential: Merge cover page with all attachments
+    #     if confidential_attachments or non_confidential_attachments:
+    #         confidential_stream = self._merge_attachments(
+    #             confidential_cover_path, confidential_attachments + non_confidential_attachments
+    #         )
+    #         saved_documents["Confidential"] = self.save_merged_document(
+    #             confidential_stream,
+    #             filename_suffix="_Minutes_Confidential.pdf",
+    #             description=f"Confidential minutes for event {self.name}"
+    #         )
+    #
+    #     # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
+    #     if non_confidential_cover_path:
+    #         if non_confidential_attachments:
+    #             non_confidential_stream = self._merge_attachments(
+    #                 non_confidential_cover_path, non_confidential_attachments
+    #             )
+    #             saved_documents["NonConfidential"] = self.save_merged_document(
+    #                 non_confidential_stream,
+    #                 filename_suffix="_Minutes_NonConfidential.pdf",
+    #                 description=f"Non-confidential minutes for event {self.name}"
+    #             )
+    #         else:
+    #             _logger.info("Skipping non-confidential minutes document generation: no non-confidential attachments.")
+    #     else:
+    #         _logger.info("Skipping non-confidential minutes document generation: no article body.")
+    #
+    #     # Log details of saved documents
+    #     _logger.info("Number of minutes files saved: %d", len(saved_documents))
+    #     for doc_type, attachment in saved_documents.items():
+    #         if attachment:
+    #             _logger.info("Saved minutes document: %s (Type: %s)", attachment.name, doc_type)
+    #         else:
+    #             _logger.warning("No document saved for type: %s", doc_type)
+    #
+    #     # Determine user access level
+    #     user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
+    #                       self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+    #
+    #     # Explicitly return the action or any additional UI updates as needed
+    #     return self.action_open_minutes()
 
 
 class AgendaLines(models.Model):

@@ -7,6 +7,7 @@ import base64
 import logging
 from bs4 import BeautifulSoup
 from odoo.tools import html2plaintext
+from lxml import etree
 
 _logger = logging.getLogger()
 
@@ -58,6 +59,21 @@ class CalendarEventProductLine(models.Model):
         compute="_compute_presenter_domain_ids",
         store=False,
     )
+
+    # @api.model
+    # def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+    #     res = super(CalendarEventProductLine, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,
+    #                                                  submenu=submenu)
+    #     if view_type == 'tree':
+    #         doc = etree.XML(res['arch'])
+    #         for node in doc.xpath("//tree"):
+    #             # Add your conditional logic here
+    #             if self.is_minutes_created:
+    #                 node.set('create', 'false')
+    #             else:
+    #                 node.set('create', 'true')
+    #         res['arch'] = etree.tostring(doc)
+    #     return res
 
     @api.onchange('description')
     def _onchange_description_attachment(self):
@@ -202,14 +218,14 @@ class CalendarEventProductLine(models.Model):
                 })
                 _logger.info(f"Created new product document {new_document.id} for attachment {attachment.id}")
 
-        # Call the `delete_article` method from the related calendar
-        if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
-            _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
-            self.calendar_id.delete_article()
-
-        if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
-            _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
-            self.calendar_id.reload_func()
+        # # Call the `delete_article` method from the related calendar
+        # if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
+        #     _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
+        #     self.calendar_id.delete_article()
+        #
+        # if self.calendar_id and hasattr(self.calendar_id, 'delete_article'):
+        #     _logger.info(f"Calling delete_article for Calendar Event {self.calendar_id.id}")
+        #     self.calendar_id.reload_func()
 
 
         return {

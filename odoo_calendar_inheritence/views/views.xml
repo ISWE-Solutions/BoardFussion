@@ -185,10 +185,9 @@
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
-                           context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}"
-                           options="{'no_create': False, 'reload_on_save': True}" >
+                           context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
 
-                        <tree >
+                        <tree create="create_text">
                             <control>
                                 <create string="Add Agenda"
                                         groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -328,7 +327,7 @@
                             string="Publish Minutes"
                             type="object"
                             class="btn btn-success m-1"
-                            invisible="not is_minutes_created or is_minutes_uploaded"
+                            invisible="is_minutes_created or is_minutes_uploaded"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                 </page>
             </xpath>
@@ -373,5 +372,15 @@
 
         </field>
     </record>
+
+
+    <record id="action_calendar_event_inherit" model="ir.actions.act_window">
+        <field name="name">Calendar Event (Inherited)</field>
+        <field name="res_model">calendar.event</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="calendar.view_calendar_event_form"/>
+        <field name="context">{'default_is_boardpack_created': True}</field>
+    </record>
+
 
 </odoo>
