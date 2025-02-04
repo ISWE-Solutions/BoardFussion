@@ -105,7 +105,7 @@
                 <button class="oe_stat_button" name="action_open_minutes" type="object"
                         string="View minutes"
                         icon="fa-external-link"
-                        invisible="not is_minutes_created">
+                        invisible="not is_minutes_published">
                 </button>
                 <button class="oe_stat_button" type="action" name="%(odoo_calendar_inheritence.action_attendees_lines)d"
                         context="{'default_calendar_id': active_id}" icon="fa-calendar"
@@ -260,6 +260,9 @@
                 <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
+                    <field name="is_confidential_minutes_uploaded" invisible="1"/>
+                    <field name="is_non_confidential_minutes_uploaded" invisible="1"/>
+                    <field name="is_minutes_published" invisible="1"/>
                     <field name="is_description_created" invisible="1"/>
                     <field name="is_minutes_created" invisible="1"/>
                     <field name="is_minutes_uploaded" invisible="1"/>
@@ -276,8 +279,8 @@
                             string="Upload Confidential Minutes"
                             class="btn btn-black"
                             icon="fa-paperclip"
-                            context="{'default_confidential': False}"
-                            invisible="action_visibility == 'hide' or is_minutes_created"
+                            context="{'default_confidential': True, 'upload_type': 'confidential'}"
+                            invisible="action_visibility == 'hide' or is_minutes_created or is_confidential_minutes_uploaded"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <button name="action_open_documents_minutes"
@@ -285,8 +288,8 @@
                             string="Upload Non-Confidential Minutes"
                             class="btn btn-grey"
                             icon="fa-paperclip"
-                            context="{'default_confidential': False}"
-                            invisible="action_visibility == 'hide' or is_minutes_created or not article_non_exists"
+                            context="{'default_confidential': False, 'upload_type': 'non_confidential'}"
+                            invisible="action_visibility == 'hide' or is_minutes_created or not article_non_exists or is_non_confidential_minutes_uploaded "
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <group string="Meeting Attendees">
@@ -312,13 +315,13 @@
                             confirm="Do you want to proceed ?"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                    <button string="Confidential Minutes" invisible="not is_minutes_created or is_minutes_uploaded"
+                    <button string="Confidential Minutes" invisible="not is_minutes_created or is_minutes_uploaded or is_minutes_published"
                             name="action_view_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <button string="Non Confidential Minutes"
-                            invisible="not article_non_exists or not is_minutes_created or is_minutes_uploaded "
+                            invisible="not article_non_exists or not is_minutes_created or is_minutes_uploaded or is_minutes_published "
                             name="action_view_alternate_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -327,7 +330,7 @@
                             string="Publish Minutes"
                             type="object"
                             class="btn btn-success m-1"
-                            invisible="is_minutes_created or is_minutes_uploaded"
+                            invisible="is_minutes_uploaded or is_minutes_published"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                 </page>
             </xpath>

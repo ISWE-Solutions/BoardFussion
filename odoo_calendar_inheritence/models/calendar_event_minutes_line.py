@@ -180,8 +180,8 @@ class CalendarEventMinutesLine(models.Model):
 
                 # Set is_minutes_created to True on the associated calendar.event
                 if record.calendar_id and not record.calendar_id.is_minutes_created:
-                    record.calendar_id.is_minutes_created = True
                     record.calendar_id.is_minutes_uploaded = True
+                    record.calendar_id.is_minutes_published = True
                     _logger.info(f"Set is_minutes_created to True for Calendar Event {record.calendar_id.id}")
 
         except Exception as e:

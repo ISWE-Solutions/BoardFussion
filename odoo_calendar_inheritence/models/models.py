@@ -152,9 +152,13 @@ class OdooCalendarInheritence(models.Model):
     )
     has_confidential_agenda_item = fields.Boolean(compute='_compute_has_confidential_agenda_item')
     is_minutes_created = fields.Boolean(string = "Are minutes Generated")
+    is_minutes_published = fields.Boolean(string="Are minutes published")
     is_minutes_uploaded = fields.Boolean(string="Are minutes Uploaded")
     is_boardpack_created = fields.Boolean(string="Are Boardpacks Generated")
     create_text= fields.Char(string="true or false",  default="False")
+
+    is_confidential_minutes_uploaded = fields.Boolean(default=False)
+    is_non_confidential_minutes_uploaded = fields.Boolean(default=False)
 
     @api.model
     def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
@@ -205,10 +209,6 @@ class OdooCalendarInheritence(models.Model):
                 rec.mom_lines_count = count
             else:
                 rec.mom_lines_count = 0
-
-
-    # def _compute_mom_count(self):
-    #     pass
 
     # ----------------------------------------------------------------------------
     #                               Calendar --> Documents
@@ -1130,9 +1130,14 @@ class OdooCalendarInheritence(models.Model):
                 'target': 'current',
             }
 
-    def action_open_documents_minutes(self):
+    def action_open_documents_minutes(self, upload_type=None):
         self.ensure_one()
         confidential = self.env.context.get('default_confidential', False)
+
+        if upload_type == "confidential":
+            self.is_confidential_minutes_uploaded = True
+        elif upload_type == "non_confidential":
+            self.is_non_confidential_minutes_uploaded = True
 
         # Create a new record or update the confidential field
         product_line = self.env['calendar.event.minutes.line'].create({
@@ -1604,154 +1609,6 @@ class OdooCalendarInheritence(models.Model):
         print("Performing standard duplication...")
         return super(OdooCalendarInheritence, self).copy(default)
 
-    def image_to_pdf(self, image_data):
-        """
-        Convert image data to a PDF binary.
-        """
-        from io import BytesIO
-        from reportlab.pdfgen import canvas
-
-        # Decode the base64 image data
-        image_stream = BytesIO(base64.b64decode(image_data))
-        image = ImageReader(image_stream)
-
-        # Create a PDF in memory
-        buffer = BytesIO()
-        pdf_canvas = canvas.Canvas(buffer)
-
-        # Get image dimensions
-        width, height = image.getSize()
-
-        # Set the page size to match the image dimensions
-        pdf_canvas.setPageSize((width, height))
-
-        # Draw the image on the canvas
-        pdf_canvas.drawImage(image, 0, 0, width=width, height=height)
-
-        pdf_canvas.save()
-
-        # Return the binary PDF content
-        buffer.seek(0)
-        return buffer.read()
-
-    def docx_to_pdf(self, docx_data):
-        """
-        Convert a DOCX file (binary data) to a properly formatted PDF
-        with support for text alignment, spacing, and list numbering/bullets.
-        """
-        # Decode and load the DOCX file from base64-encoded data
-        doc = Document(BytesIO(base64.b64decode(docx_data)))
-
-        # Prepare a PDF stream to write to
-        pdf_stream = BytesIO()
-        pdf = SimpleDocTemplate(
-            pdf_stream,
-            pagesize=letter,
-            leftMargin=inch,
-            rightMargin=inch,
-            topMargin=inch,
-            bottomMargin=inch,
-        )
-
-        # Define styles for the PDF
-        styles = getSampleStyleSheet()
-
-        # Add custom styles only if they are not already defined
-        if 'Center' not in styles:
-            styles.add(ParagraphStyle(name='Center', alignment=1))  # Center-aligned
-        if 'Right' not in styles:
-            styles.add(ParagraphStyle(name='Right', alignment=2))  # Right-aligned
-        if 'Bold' not in styles:
-            styles.add(ParagraphStyle(name='Bold', fontName='Helvetica-Bold'))  # Bold text
-        # Do not add 'Italic' since it already exists in the default stylesheet
-
-        story = []  # Content for the PDF
-
-        # Track list numbering
-        list_counter = 1
-        roman_counter = 1
-
-        for paragraph in doc.paragraphs:
-            # Skip empty paragraphs
-            if not paragraph.text.strip():
-                continue
-
-            # Determine alignment
-            if paragraph.alignment == 1:  # Center-aligned
-                style = styles['Center']
-            elif paragraph.alignment == 2:  # Right-aligned
-                style = styles['Right']
-            else:  # Default to left-aligned
-                style = styles['BodyText']
-
-            # Build the formatted text
-            formatted_text = ""
-            for run in paragraph.runs:
-                text = escape(run.text)  # Escape special characters
-                if run.bold:
-                    formatted_text += f"<b>{text}</b>"
-                elif run.italic:
-                    formatted_text += f"<i>{text}</i>"
-                else:
-                    formatted_text += text
-
-            # Handle list paragraphs
-            if paragraph.style.name.lower().startswith('list'):
-                if "roman" in paragraph.style.name.lower():  # Roman numeral lists
-                    formatted_text = f"{roman_counter}. {formatted_text}"
-                    roman_counter += 1
-                else:  # Regular numbered lists
-                    formatted_text = f"{list_counter}. {formatted_text}"
-                    list_counter += 1
-
-                # Add as a list item
-                story.append(ListFlowable([ListItem(Paragraph(formatted_text, style))], bulletType='bullet'))
-            else:
-                # Reset counters for non-list paragraphs
-                list_counter = 1
-                roman_counter = 1
-
-                # Add the paragraph
-                story.append(Paragraph(formatted_text, style))
-
-            # Add spacing between paragraphs
-            story.append(Spacer(1, 0.2 * inch))
-
-        # Build the PDF document
-        pdf.build(story)
-
-        # Retrieve the binary PDF content
-        pdf_stream.seek(0)
-        return pdf_stream.read()
-
-    def html_to_pdf(self, html_content):
-        """
-        Convert HTML content to a PDF using a library like `weasyprint` or `wkhtmltopdf`.
-        """
-        pdf_stream = io.BytesIO()
-        HTML(string=html_content).write_pdf(pdf_stream)
-        pdf_stream.seek(0)
-        return pdf_stream.getvalue()
-
-    def add_media_placeholder(self, pdf_writer, media_files):
-        """
-        Add placeholders for media files in the merged PDF.
-        """
-        from reportlab.pdfgen import canvas
-
-        for media_file in media_files:
-            pdf_page = io.BytesIO()
-            pdf_canvas = canvas.Canvas(pdf_page)
-            pdf_canvas.drawString(50, 750, f"Media File: {media_file.name}")
-            pdf_canvas.drawString(50, 730, f"File Type: {media_file.mimetype}")
-            pdf_canvas.drawString(50, 710, "Media files cannot be embedded.")
-            pdf_canvas.save()
-            pdf_page.seek(0)
-
-            pdf_reader = PdfReader(pdf_page)
-            for page in pdf_reader.pages:
-                pdf_writer.add_page(page)
-
     def save_merged_document(self, pdf_stream, filename_suffix, description):
         """
         Save a single PDF document to `ir.attachment` and associate it with `product.document`.
@@ -1871,41 +1728,6 @@ class OdooCalendarInheritence(models.Model):
             _logger.info("Removed %d attachment(s) for calendar.event '%s'.", len(existing_attachments), self.name)
         else:
             _logger.info("No confidential or non-confidential attachments found for calendar.event '%s'.", self.name)
-
-    def add_watermark_to_pdf(self, page):
-        """
-        Apply watermark to a PDF page unless the context specifies no restrictions.
-        """
-        # Check context or conditions to skip watermarking
-        if self.env.context.get('skip_watermark', False):
-            return page
-
-        # Apply watermark as usual
-        page_width = int(float(page.mediabox.width))
-        page_height = int(float(page.mediabox.height))
-
-        # Create a blank canvas for the page
-        page_image = Image.new('RGB', (page_width, page_height), color=(255, 255, 255))  # White background
-        blurred_image = page_image.filter(ImageFilter.GaussianBlur(radius=10))
-
-        # Draw watermark text
-        draw = ImageDraw.Draw(blurred_image)
-        font = ImageFont.load_default()  # Load a default font
-        watermark_text = "RESTRICTED"
-        text_width, text_height = draw.textsize(watermark_text, font=font)
-        text_position = ((page_width - text_width) // 2, (page_height - text_height) // 2)
-        draw.text(text_position, watermark_text, fill=(255, 0, 0), font=font)
-
-        # Convert to PDF page
-        rgb_image = blurred_image.convert('RGB')
-        image_pdf = io.BytesIO()
-        rgb_image.save(image_pdf, format='PDF')
-        image_pdf.seek(0)
-        image_reader = PdfReader(image_pdf)
-
-        # Merge watermark with original page
-        page.merge_page(image_reader.pages[0])
-        return page
 
     def _classify_attachments(self):
         """
@@ -2218,7 +2040,6 @@ class OdooCalendarInheritence(models.Model):
         self.is_board_park = True
         action = self.action_open_boardpack()
 
-        # Explicitly return the action to propagate it
         return action
 
     def action_merge_minutes_documents(self):
@@ -2300,89 +2121,8 @@ class OdooCalendarInheritence(models.Model):
                           self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
 
         # Explicitly return the action or any additional UI updates as needed
+        self.is_minutes_published = True
         return self.action_open_minutes()
-
-
-    # def action_merge_minutes_documents(self):
-    #     """
-    #     Merge attachments into two distinct documents for meeting minutes:
-    #     Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
-    #     Stream the appropriate document based on user roles.
-    #     """
-    #     self.ensure_one()
-    #
-    #     # Generate the confidential and non-confidential cover HTML and save as PDFs
-    #     company_logo_base64 = self.env.company.logo or None
-    #     confidential_minutes_article_body = self.description_article_id.body if self.description_article_id else None
-    #
-    #     non_conf_minutes_article = self.env['knowledge.article'].search(
-    #         [('id', '=', self.alternate_description_article_id.id)], limit=1)
-    #     non_conf_minutes_article_body = non_conf_minutes_article.body if non_conf_minutes_article else None
-    #
-    #     if not confidential_minutes_article_body:
-    #         raise UserError(_("No article found for confidential minutes cover page."))
-    #
-    #     # Generate confidential cover page
-    #     self._generate_minutes_cover_html(company_logo_base64, confidential_minutes_article_body, is_confidential=True)
-    #     confidential_cover_path = '/opt/confidential_minutes_cover.pdf'
-    #
-    #     # Generate non-confidential cover page if non_conf_minutes_article_body exists
-    #     non_confidential_cover_path = None
-    #     if non_conf_minutes_article_body:
-    #         self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
-    #         non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
-    #
-    #     # Classify attachments for minutes
-    #     confidential_attachments, non_confidential_attachments = self._classify_attachments()
-    #
-    #     if not confidential_attachments and not non_confidential_attachments:
-    #         _logger.warning("No attachments found to merge for minutes.")
-    #         return {}
-    #
-    #     # Merge files
-    #     saved_documents = {}
-    #
-    #     # For Confidential: Merge cover page with all attachments
-    #     if confidential_attachments or non_confidential_attachments:
-    #         confidential_stream = self._merge_attachments(
-    #             confidential_cover_path, confidential_attachments + non_confidential_attachments
-    #         )
-    #         saved_documents["Confidential"] = self.save_merged_document(
-    #             confidential_stream,
-    #             filename_suffix="_Minutes_Confidential.pdf",
-    #             description=f"Confidential minutes for event {self.name}"
-    #         )
-    #
-    #     # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
-    #     if non_confidential_cover_path:
-    #         if non_confidential_attachments:
-    #             non_confidential_stream = self._merge_attachments(
-    #                 non_confidential_cover_path, non_confidential_attachments
-    #             )
-    #             saved_documents["NonConfidential"] = self.save_merged_document(
-    #                 non_confidential_stream,
-    #                 filename_suffix="_Minutes_NonConfidential.pdf",
-    #                 description=f"Non-confidential minutes for event {self.name}"
-    #             )
-    #         else:
-    #             _logger.info("Skipping non-confidential minutes document generation: no non-confidential attachments.")
-    #     else:
-    #         _logger.info("Skipping non-confidential minutes document generation: no article body.")
-    #
-    #     # Log details of saved documents
-    #     _logger.info("Number of minutes files saved: %d", len(saved_documents))
-    #     for doc_type, attachment in saved_documents.items():
-    #         if attachment:
-    #             _logger.info("Saved minutes document: %s (Type: %s)", attachment.name, doc_type)
-    #         else:
-    #             _logger.warning("No document saved for type: %s", doc_type)
-    #
-    #     # Determine user access level
-    #     user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
-    #                       self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-    #
-    #     # Explicitly return the action or any additional UI updates as needed
-    #     return self.action_open_minutes()
 
 
 class AgendaLines(models.Model):
