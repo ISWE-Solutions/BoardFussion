@@ -1130,32 +1130,55 @@ class OdooCalendarInheritence(models.Model):
                 'target': 'current',
             }
 
-    def action_open_documents_minutes(self, upload_type=None):
+
+    # def action_open_documents_minutes(self):
+    #     self.ensure_one()
+    #     upload_type = self.env.context.get('upload_type')
+    #     confidential = self.env.context.get('default_confidential', False)
+    #
+    #     return {
+    #         'type': 'ir.actions.act_window',
+    #         'name': 'Minutes Upload',
+    #         'res_model': 'calendar.event.minutes.line',
+    #         'view_mode': 'form',
+    #         'view_id': self.env.ref('odoo_calendar_inheritence.calendar_event_product_line_form_view_minutes').id,
+    #         'target': 'new',
+    #         'context': {
+    #             'default_calendar_id': self.id,
+    #             'default_confidential': confidential,
+    #             'upload_type': upload_type,  # Pass upload_type to context
+    #         },
+    #     }
+
+    def action_open_documents_minutes(self):
         self.ensure_one()
+        upload_type = self.env.context.get('upload_type')
         confidential = self.env.context.get('default_confidential', False)
 
-        if upload_type == "confidential":
-            self.is_confidential_minutes_uploaded = True
-        elif upload_type == "non_confidential":
-            self.is_non_confidential_minutes_uploaded = True
+        # Fetch board members and secretaries if confidential is True
+        restricted_partners = []
+        if confidential:
+            board_member_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+            board_secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
 
-        # Create a new record or update the confidential field
-        product_line = self.env['calendar.event.minutes.line'].create({
-            'calendar_id': self.id,
-            'confidential': confidential,
-        })
-
-        # Explicitly call the onchange method to apply the desired logic
-        product_line._onchange_confidential()
+            restricted_users = self.env['res.users'].search([
+                ('groups_id', 'in', [board_member_group.id, board_secretary_group.id])
+            ])
+            restricted_partners = restricted_users.mapped('partner_id').ids
 
         return {
             'type': 'ir.actions.act_window',
             'name': 'Minutes Upload',
             'res_model': 'calendar.event.minutes.line',
-            'res_id': product_line.id,  # Open the created/updated record
             'view_mode': 'form',
             'view_id': self.env.ref('odoo_calendar_inheritence.calendar_event_product_line_form_view_minutes').id,
             'target': 'new',
+            'context': {
+                'default_calendar_id': self.id,
+                'default_confidential': confidential,
+                'upload_type': upload_type,
+                'default_Restricted': [(6, 0, restricted_partners)],  # Set default Restricted users
+            },
         }
 
     @api.depends('product_line_ids')
@@ -1225,35 +1248,43 @@ class OdooCalendarInheritence(models.Model):
             rec.has_attendees_added = False
             rec.has_attendees_confirmed = False
             rec.is_minutes_created = False
+            rec.is_minutes_published = False
+            rec.is_confidential_minutes_uploaded = False
+            rec.is_non_confidential_minutes_uploaded = False
             rec.is_minutes_uploaded = False
+            self.env['calendar.event.minutes.line'].delete_all_for_calendar_event(rec.id)
+            rec.action_delete_minutes_documents()
             rec.description_article_id.sudo().unlink()
             rec.action_delete_agenda_descriptions()
 
     def action_add_attendees(self):
         partners = []
         for partner in self.partner_ids:
-            # Retrieve the related employee and position
-            employee = self.env['hr.employee'].search([('work_email', '=', partner.email)], limit=1)
+            # Search by partner ID (more reliable than email)
+            employee = self.env['hr.employee'].search(
+                [('partner_id', '=', partner.id)],
+                limit=1
+            )
+            # Fallback to email search if needed (optional)
+            if not employee and partner.email:
+                employee = self.env['hr.employee'].search(
+                    [('work_email', '=', partner.email)],
+                    limit=1
+                )
             position = employee.job_id.name if employee else 'Unknown Position'
 
-            # Log the partner and their position
             _logger.info("Attendee: %s, Position: %s", partner.name, position)
-
-            # Check if the partner is linked to a user
             user = self.env['res.users'].search([('partner_id', '=', partner.id)], limit=1)
             if user:
-                # Check the user's group membership
                 is_board_member = user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
                 is_board_secretary = user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
 
-                # Log group membership
                 if is_board_member or is_board_secretary:
                     role = 'Board Member' if is_board_member else 'Board Secretary'
                     _logger.info("Attendee %s is a %s", partner.name, role)
                 else:
                     _logger.info("Attendee %s does not belong to any board-related group", partner.name)
 
-            # Add attendee details
             partners.append(
                 Command.create(
                     {
@@ -2044,9 +2075,8 @@ class OdooCalendarInheritence(models.Model):
 
     def action_merge_minutes_documents(self):
         """
-        Merge attachments into two distinct documents for meeting minutes:
-        Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
-        Stream the appropriate document based on user roles.
+        Generate and save cover pages for meeting minutes (Confidential and Non-Confidential),
+        without merging any attachments.
         """
         self.ensure_one()
 
@@ -2071,37 +2101,19 @@ class OdooCalendarInheritence(models.Model):
             self._generate_minutes_cover_html(company_logo_base64, non_conf_minutes_article_body, is_confidential=False)
             non_confidential_cover_path = '/opt/non_confidential_minutes_cover.pdf'
 
-        # Classify attachments for minutes
-        confidential_attachments, non_confidential_attachments = self._classify_attachments()
-
         saved_documents = {}
 
-        # For Confidential: Merge cover page with all attachments
-        if confidential_attachments or non_confidential_attachments or not (
-                confidential_attachments and non_confidential_attachments):
-            confidential_stream = self._merge_attachments(
-                confidential_cover_path, confidential_attachments + non_confidential_attachments
-            )
+        # Save the confidential cover page
+        with open(confidential_cover_path, 'rb') as confidential_stream:
             saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
                 filename_suffix="_Minutes_Confidential.pdf",
                 description=f"Confidential minutes for event {self.name}"
             )
 
-        # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
+        # Save the non-confidential cover page if it exists
         if non_confidential_cover_path:
-            if non_confidential_attachments:
-                non_confidential_stream = self._merge_attachments(
-                    non_confidential_cover_path, non_confidential_attachments
-                )
-                saved_documents["NonConfidential"] = self.save_merged_document(
-                    non_confidential_stream,
-                    filename_suffix="_Minutes_NonConfidential.pdf",
-                    description=f"Non-confidential minutes for event {self.name}"
-                )
-            else:
-                # Save the non-confidential cover page even if there are no attachments
-                non_confidential_stream = open(non_confidential_cover_path, 'rb')
+            with open(non_confidential_cover_path, 'rb') as non_confidential_stream:
                 saved_documents["NonConfidential"] = self.save_merged_document(
                     non_confidential_stream,
                     filename_suffix="_Minutes_NonConfidential.pdf",
@@ -2116,13 +2128,49 @@ class OdooCalendarInheritence(models.Model):
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
 
-        # Determine user access level
-        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
-                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-
         # Explicitly return the action or any additional UI updates as needed
         self.is_minutes_published = True
         return self.action_open_minutes()
+
+    def action_delete_minutes_documents(self):
+        """
+        Delete the saved confidential and non-confidential minutes documents
+        related to this calendar event.
+        """
+        self.ensure_one()
+
+        # Define the expected file name suffixes
+        filename_suffixes = ["_Minutes_Confidential.pdf", "_Minutes_NonConfidential.pdf"]
+
+        # Search for matching attachments
+        attachments = self.env['ir.attachment'].search([
+            ('res_model', '=', 'calendar.event'),
+            ('res_id', '=', self.id),
+            ('name', 'ilike', self.name)
+        ])
+
+        # Filter attachments that match the expected filename patterns
+        attachments_to_delete = attachments.filtered(
+            lambda att: any(suffix in att.name for suffix in filename_suffixes))
+
+        if attachments_to_delete:
+            attachments_to_delete.unlink()
+            _logger.info("Deleted minutes documents for event: %s", self.name)
+        else:
+            _logger.warning("No minutes documents found for deletion for event: %s", self.name)
+
+        # Delete related product.document records
+        product_documents = self.env['product.document'].search([
+            ('ir_attachment_id', 'in', attachments_to_delete.ids)
+        ])
+
+        if product_documents:
+            product_documents.unlink()
+            _logger.info("Deleted product.document records linked to minutes for event: %s", self.name)
+        else:
+            _logger.warning("No product.document records found for deletion for event: %s", self.name)
+
+        return True
 
 
 class AgendaLines(models.Model):

@@ -185,11 +185,13 @@
             <xpath expr="//page[@name='page_invitations']" position="after">
                 <page name="agenda" string="Meeting Agenda" invisible="not product_id">
                     <field name="product_line_ids" widget="one2many"
+                           readonly="has_attendees_added"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
 
-                        <tree create="create_text">
+                        <tree create="">
                             <control>
                                 <create string="Add Agenda"
+                                        invisible="1"
                                         groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                             </control>
                             <field name="sequence" widget="handle"/>
@@ -267,6 +269,7 @@
                     <field name="is_minutes_created" invisible="1"/>
                     <field name="is_minutes_uploaded" invisible="1"/>
                     <field name="action_visibility" widget="radio" options="{'horizontal': true}" class="mt-2"
+                           invisible="is_minutes_created or is_confidential_minutes_uploaded or is_non_confidential_minutes_uploaded"
                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
                     <button name="action_create_agenda_descriptions" type="object" string="Generate minutes"
@@ -291,6 +294,9 @@
                             context="{'default_confidential': False, 'upload_type': 'non_confidential'}"
                             invisible="action_visibility == 'hide' or is_minutes_created or not article_non_exists or is_non_confidential_minutes_uploaded "
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+
+
+
 
                     <group string="Meeting Attendees">
                     </group>
@@ -330,7 +336,7 @@
                             string="Publish Minutes"
                             type="object"
                             class="btn btn-success m-1"
-                            invisible="is_minutes_uploaded or is_minutes_published"
+                            invisible="not is_minutes_created or is_minutes_uploaded or is_minutes_published"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                 </page>
             </xpath>

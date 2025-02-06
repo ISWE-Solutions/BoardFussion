@@ -123,6 +123,7 @@ class CalendarEventMinutesLine(models.Model):
     def create(self, values):
         records = super().create(values)
         records._process_minutes_line()
+        records._update_calendar_status()
         return records
 
     def write(self, values):
@@ -156,27 +157,33 @@ class CalendarEventMinutesLine(models.Model):
                         f"Assigned product_document_id {new_document.id} to Calendar Event Minutes Line {record.id}"
                     )
 
-                # Process PDF attachments
                 if record.pdf_attachment:
-                    for attachment in record.pdf_attachment:
-                        # Ensure attachment is linked to the calendar event
-                        attachment.write({
-                            'res_model': 'calendar.event',
-                            'res_id': record.calendar_id.id,
-                        })
+                    existing_docs = document_model.sudo().search([
+                        ('ir_attachment_id', 'in', record.pdf_attachment.ids),
+                        ('res_model', '=', 'product.template'),
+                        ('res_id', '=', product.id),
+                    ])
+                    existing_attachment_ids = existing_docs.mapped('ir_attachment_id.id')
 
-                        restricted_partner_ids = list(set(record.Restricted.ids))
-                        new_document = document_model.sudo().create({
-                            'res_model': 'product.template',
-                            'name': attachment.name,
-                            'res_id': product.id,
-                            'ir_attachment_id': attachment.id,
-                            'partner_ids': [(6, 0, restricted_partner_ids)]
-                        })
-                        _logger.info(
-                            f"Created new Minute document {new_document.id} for attachment {attachment.id} "
-                            f"and linked it to Calendar Event {record.calendar_id.id}"
-                        )
+                    for attachment in record.pdf_attachment:
+                        if attachment.id not in existing_attachment_ids:  # Prevent duplicate processing
+                            attachment.write({
+                                'res_model': 'calendar.event',
+                                'res_id': record.calendar_id.id,
+                            })
+
+                            restricted_partner_ids = list(set(record.Restricted.ids))
+                            new_document = document_model.sudo().create({
+                                'res_model': 'product.template',
+                                'name': attachment.name,
+                                'res_id': product.id,
+                                'ir_attachment_id': attachment.id,
+                                'partner_ids': [(6, 0, restricted_partner_ids)]
+                            })
+                            _logger.info(
+                                f"Created new Minute document {new_document.id} for attachment {attachment.id} "
+                                f"and linked it to Calendar Event {record.calendar_id.id}"
+                            )
 
                 # Set is_minutes_created to True on the associated calendar.event
                 if record.calendar_id and not record.calendar_id.is_minutes_created:
@@ -202,6 +209,26 @@ class CalendarEventMinutesLine(models.Model):
             },
         }
 
+    def _update_calendar_status(self):
+        """Updates the status fields on the related calendar event when minutes are successfully saved."""
+        for record in self:
+            if record.id:  # Ensure the record is not a draft (checking if it has been saved)
+                upload_type = self.env.context.get('upload_type')
+                confidential = self.env.context.get('default_confidential', False)
 
+                if upload_type == "confidential":
+                    record.calendar_id.is_confidential_minutes_uploaded = True
+                elif upload_type == "non_confidential":
+                    record.calendar_id.is_non_confidential_minutes_uploaded = True
 
+    @api.model
+    def delete_all_for_calendar_event(self, calendar_event_id):
+        """Delete all minutes line records linked to the specified calendar event.
+
+        Args:
+            calendar_event_id (int): ID of the calendar.event to delete linked records for.
+        """
+        records = self.search([('calendar_id', '=', calendar_event_id)])
+        records.unlink()
+        return True
 
