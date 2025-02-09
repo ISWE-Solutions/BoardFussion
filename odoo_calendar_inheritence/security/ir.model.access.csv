@@ -16,3 +16,4 @@ access_product_document_member,access.product.document.member,odoo_calendar_inhe
 access_product_document_secretary,access.product.document.secretary,odoo_calendar_inheritence.model_product_document,odoo_calendar_inheritence.group_agenda_meeting_board_secretary,1,1,1,1
 access_calendar_attendee_role,access.calendar.attendee.role,odoo_calendar_inheritence.model_calendar_attendee_role,base.group_user,1,1,1,1
 access_calendar_event_minutes_line,access.calendar.event.minutes.line,odoo_calendar_inheritence.model_calendar_event_minutes_line,base.group_user,1,1,1,1
+access_task_checklist,access.task.checklist,compliance.model_task_checklist,base.group_user,1,1,1,1

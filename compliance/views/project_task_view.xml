@@ -35,7 +35,7 @@
                 <page name="compliance_checklist" string="Compliance Checklist"
                       invisible="task_type != 'compliance'">
                     <field name="task_checklist_ids">
-                        <tree editable="bottom">
+                        <tree editable="bottom" delete="True">
                             <field name="name"/>
                             <field name="progress" string="Percentage Done" attrs="{'max': 100.0}"/>
                             <field name="progress" widget="progressbar"/>

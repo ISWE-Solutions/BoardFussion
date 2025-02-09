@@ -1,15 +1,24 @@
-console.log("Favicon JS is being executed");
 (function () {
-    const link = document.querySelector("link[rel~='icon']");
-    const faviconPath = '/committee_module/static/src/description/logo.png';
-    const timestamp = new Date().getTime(); // Add cache-busting timestamp
-    if (!link) {
-        const newLink = document.createElement('link');
-        newLink.rel = 'icon';
-        newLink.href = `${faviconPath}?v=${timestamp}`;
-        document.head.appendChild(newLink);
-    } else {
-        link.href = `${faviconPath}?v=${timestamp}`;
+    async function updateFavicon() {
+        try {
+            const response = await fetch('/web/image/res.company/1/logo?unique=' + new Date().getTime());
+            if (response.ok) {
+                const logoUrl = response.url;
+                let link = document.querySelector("link[rel~='icon']");
+                if (!link) {
+                    link = document.createElement('link');
+                    link.rel = 'icon';
+                    document.head.appendChild(link);
+                }
+                link.href = logoUrl;
+                console.log("Favicon updated to:", link.href);
+            } else {
+                console.error("Failed to fetch company logo.");
+            }
+        } catch (error) {
+            console.error("Error fetching company logo:", error);
+        }
     }
-    console.log("Favicon updated to:", link.href);
+
+    updateFavicon();
 })();

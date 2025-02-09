@@ -418,6 +418,7 @@ class OdooCalendarInheritence(models.Model):
         def format_attendees_section(title, attendees):
             if not attendees:
                 return ""
+
             section = f"""
             <div class="table-responsive my-3">
                 <table class="table" style="table-layout: fixed; width: 100%; border: none; border-collapse: collapse;">
@@ -434,18 +435,25 @@ class OdooCalendarInheritence(models.Model):
                         </tr>
                     </thead>
                     <tbody>
-                        <tr style="border: none;">
-                            <td rowspan="{len(attendees)}" class="fw-bold" style="border: none;">{title}</td>
-                            <td rowspan="{len(attendees)}" class="text-center" style="border: none;">:</td>
-                            <td style="border: none;">{attendees[0].name} <span class="text-muted">({attendees[0].function})</span></td>
-                        </tr>
             """
-            for attendee in attendees[1:]:
+
+            for idx, attendee in enumerate(attendees):
+                # Search for the employee linked to this partner
+                employee = self.env['hr.employee'].sudo().search([('partner_id', '=', attendee.id)], limit=1)
+
+                if not employee and attendee.email:
+                    employee = self.env['hr.employee'].sudo().search([('work_email', '=', attendee.email)], limit=1)
+
+                position = employee.job_id.name if employee and employee.job_id else "Unknown Position"
+
                 section += f"""
-                        <tr style="border: none;">
-                            <td style="border: none;">{attendee.name} <span class="text-muted">({attendee.function})</span></td>
-                        </tr>
+                    <tr style="border: none;">
+                        {"<td rowspan='{}' class='fw-bold' style='border: none;'>{}</td>".format(len(attendees), title) if idx == 0 else ""}
+                        {"<td rowspan='{}' class='text-center' style='border: none;'>:</td>".format(len(attendees)) if idx == 0 else ""}
+                        <td style="border: none;">{attendee.name} <span class="text-muted">({position})</span></td>
+                    </tr>
                 """
+
             section += """
                     </tbody>
                 </table>
@@ -453,14 +461,12 @@ class OdooCalendarInheritence(models.Model):
             """
             return section
 
-        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
-                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
 
         # Step 2: Separate attendees into board attendees and regular attendees
         board_attendees = [attendee for attendee in self.partner_ids if attendee.user_ids and any(
-            user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or
             user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-            for user in attendee.user_ids
+            for user in attendee.user_ids if
+            not user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
         )]
 
         regular_attendees = [attendee for attendee in self.partner_ids if attendee not in board_attendees]
@@ -959,7 +965,7 @@ class OdooCalendarInheritence(models.Model):
         # Classify attendees into two sections
         for attendee in self.attendees_lines_ids:
             if attendee.has_attended:
-                if attendee.is_board_member or attendee.is_board_secretary:
+                if attendee.is_board_member and not attendee.is_board_secretary:
                     attendees_present.append(attendee)
                 else:
                     attendees_in_attendance.append(attendee)
@@ -1077,7 +1083,7 @@ class OdooCalendarInheritence(models.Model):
 
         self.is_description_created = True
         self.is_minutes_created = True
-        return self.action_view_description_article()
+        # return self.action_view_description_article()
 
     def action_view_knowledge_article(self):
         self.ensure_one()
@@ -1129,7 +1135,6 @@ class OdooCalendarInheritence(models.Model):
                 'res_id': self.alternate_description_article_id.id,
                 'target': 'current',
             }
-
 
     # def action_open_documents_minutes(self):
     #     self.ensure_one()
@@ -1260,18 +1265,24 @@ class OdooCalendarInheritence(models.Model):
     def action_add_attendees(self):
         partners = []
         for partner in self.partner_ids:
-            # Search by partner ID (more reliable than email)
-            employee = self.env['hr.employee'].search(
-                [('partner_id', '=', partner.id)],
-                limit=1
-            )
-            # Fallback to email search if needed (optional)
+            employee = self.env['hr.employee'].sudo().search([('partner_id', '=', partner.id)], limit=1)
+            _logger.info(
+                f"Checking partner {partner.name} - Found Employee: {employee.name if employee else 'None'}")
+
             if not employee and partner.email:
                 employee = self.env['hr.employee'].search(
                     [('work_email', '=', partner.email)],
                     limit=1
                 )
-            position = employee.job_id.name if employee else 'Unknown Position'
+            if employee:
+                position = employee.job_id.name if employee.job_id else 'Unknown Position'
+            else:
+                position = 'Unknown Position'
+
+
+                # Debugging output
+            _logger.info(
+                f"Partner: {partner.name}, Employee: {employee.name if employee else 'None'}, Position: {position}")
 
             _logger.info("Attendee: %s, Position: %s", partner.name, position)
             user = self.env['res.users'].search([('partner_id', '=', partner.id)], limit=1)
@@ -1338,57 +1349,38 @@ class OdooCalendarInheritence(models.Model):
     def action_open_boardpack(self):
         self.ensure_one()
 
-        # Fetch Confidential and NonConfidential boardpacks
-        confidential_attachment_id = self.env['ir.attachment'].search([
+        # Fetch attachments using prefix-based names
+        confidential_attachment = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
-            ('name', 'ilike', f"{self.name}_Confidential.pdf")
+            ('name', 'ilike', f"Boardpack_Confidential_{self.name}.pdf")
         ], limit=1)
 
-        non_confidential_attachment_id = self.env['ir.attachment'].search([
+        non_confidential_attachment = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
-            ('name', 'ilike', f"{self.name}_NonConfidential.pdf")
+            ('name', 'ilike', f"Boardpack_NonConfidential_{self.name}.pdf")
         ], limit=1)
 
-        # Determine accessible files from the main event
         accessible_attachment_ids = []
-        if non_confidential_attachment_id:
-            accessible_attachment_ids.append(non_confidential_attachment_id.id)
-        if confidential_attachment_id:
-            accessible_attachment_ids.append(confidential_attachment_id.id)
+        if non_confidential_attachment:
+            accessible_attachment_ids.append(non_confidential_attachment.id)
+        if confidential_attachment:
+            accessible_attachment_ids.append(confidential_attachment.id)
 
-        # Log accessible attachments
-        _logger.info("User %s is accessing the following attachments: %s",
-                     self.env.user.name, accessible_attachment_ids)
-
-        # Check if no files are accessible
         if not accessible_attachment_ids:
-            _logger.info("No accessible attachments for user %s on event %s", self.env.user.name, self.name)
             return {'type': 'ir.actions.act_window_close'}
 
-        # Fetch matching product documents
         matching_documents = self.env['product.document'].search(
-            [('ir_attachment_id', 'in', accessible_attachment_ids)])
-        _logger.info("Matching Product Document count for user %s: %d", self.env.user.name, len(matching_documents))
+            [('ir_attachment_id', 'in', accessible_attachment_ids)]
+        )
 
-        # Log retrieved document names
-        _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
-                     matching_documents.mapped('name'))
-
-        active_user = self.env.user.partner_id.id
-
-        # Return action to open documents
         return {
             'type': 'ir.actions.act_window',
             'name': 'Documents',
             'res_model': 'product.document',
             'view_mode': 'kanban,tree,form',
-            'domain': [
-                '&',
-                ('id', 'in', matching_documents.ids),
-                ('partner_ids', 'in', [active_user])
-            ],
+            'domain': [('id', 'in', matching_documents.ids), ('partner_ids', 'in', [self.env.user.partner_id.id])],
             'context': {'default_res_model': 'calendar.event', 'default_res_id': self.id},
         }
 
@@ -1399,13 +1391,13 @@ class OdooCalendarInheritence(models.Model):
         confidential_attachment_id = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
-            ('name', 'ilike', f"{self.name}_Minutes_Confidential.pdf")
+            ('name', 'ilike', f"Minutes_Confidential_{self.name}.pdf")
         ], limit=1)
 
         non_confidential_attachment_id = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
-            ('name', 'ilike', f"{self.name}_Minutes_NonConfidential.pdf")
+            ('name', 'ilike', f"Minutes_NonConfidential_{self.name}.pdf")
         ], limit=1)
 
         # Determine accessible files from the main event
@@ -1460,15 +1452,16 @@ class OdooCalendarInheritence(models.Model):
 
     def action_open_documents(self):
         self.ensure_one()
-
-        # Fetch Confidential and NonConfidential boardpacks
         confidential_attachment_ids = []
         non_confidential_attachment_ids = []
-        for suffix in ["Confidential", "NonConfidential"]:
+
+        # Fetch attachments for board packs and minutes
+        for suffix in ["Boardpack_Confidential", "Boardpack_NonConfidential", "Minutes_Confidential",
+                       "Minutes_NonConfidential"]:
             attachment = self.env['ir.attachment'].search([
                 ('res_model', '=', 'calendar.event'),
                 ('res_id', '=', self.id),
-                ('name', 'ilike', f"{self.name}_{suffix}.pdf")
+                ('name', 'ilike', f"{suffix}_{self.name}.pdf")
             ], limit=1)
             if attachment:
                 if "Confidential" in suffix:
@@ -1478,16 +1471,20 @@ class OdooCalendarInheritence(models.Model):
             else:
                 _logger.info(f"No attachment found for {suffix} file for event {self.name}")
 
-        # Fetch unrestricted attachments
-        unrestricted_attachment_ids = []
-        for line in self.product_line_ids:
-            if not line.is_user_restricted:
-                unrestricted_attachment_ids.extend(line.pdf_attachment.ids)
+        # Fetch unrestricted attachments from product_line_ids
+        unrestricted_attachment_ids = [
+            att.id for line in self.product_line_ids if not line.is_user_restricted for att in line.pdf_attachment
+        ]
 
-        minutes_attachment_ids = []
-        for line in self.minutes_line_ids:
-            if not line.is_user_restricted:
-                minutes_attachment_ids.extend(line.pdf_attachment.ids)
+        # Fetch unrestricted attachments from minutes_line_ids
+        minutes_attachment_ids = [
+            att.id for line in self.minutes_line_ids if not line.is_user_restricted for att in line.pdf_attachment
+        ]
+
+        # Fetch unrestricted attachments from calendar_minutes_event_line
+        minutes_event_attachment_ids = [
+            att.id for line in self.minutes_line_ids if not line.is_user_restricted for att in line.pdf_attachment
+        ]
 
         # Check if user is Board Member or Board Secretary
         is_board_member_or_secretary = self.env.user.has_group(
@@ -1496,13 +1493,18 @@ class OdooCalendarInheritence(models.Model):
                                            'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
 
         # Combine all accessible files
-        all_attachment_ids = unrestricted_attachment_ids + minutes_attachment_ids + non_confidential_attachment_ids
+        all_attachment_ids = (
+                unrestricted_attachment_ids +
+                minutes_attachment_ids +
+                minutes_event_attachment_ids +
+                non_confidential_attachment_ids
+        )
+
         if is_board_member_or_secretary:
             all_attachment_ids += confidential_attachment_ids
 
-        # Log the final list of accessible attachments
-        _logger.info("User %s is accessing the following attachments: %s",
-                     self.env.user.name, all_attachment_ids)
+        # Log accessible attachments
+        _logger.info("User %s is accessing the following attachments: %s", self.env.user.name, all_attachment_ids)
 
         # Check if no files are found
         if not all_attachment_ids:
@@ -1512,15 +1514,11 @@ class OdooCalendarInheritence(models.Model):
         # Fetch matching product documents
         matching_documents = self.env['product.document'].search([('ir_attachment_id', 'in', all_attachment_ids)])
         _logger.info("Matching Product Document count for user %s: %d", self.env.user.name, len(matching_documents))
-
-        # Log retrieved document names
         _logger.info("User %s retrieved the following documents: %s", self.env.user.name,
                      matching_documents.mapped('name'))
 
-        # Get active user partner ID
         active_user = self.env.user.partner_id.id
 
-        # Return action to open documents
         return {
             'type': 'ir.actions.act_window',
             'name': 'Documents',
@@ -1640,10 +1638,9 @@ class OdooCalendarInheritence(models.Model):
         print("Performing standard duplication...")
         return super(OdooCalendarInheritence, self).copy(default)
 
-    def save_merged_document(self, pdf_stream, filename_suffix, description):
+    def save_merged_document(self, pdf_stream, filename_prefix, description):
         """
         Save a single PDF document to `ir.attachment` and associate it with `product.document`.
-        Add invitees from `calendar.event` and specific groups to `partner_ids`.
         """
         self.ensure_one()
 
@@ -1651,15 +1648,15 @@ class OdooCalendarInheritence(models.Model):
         if pdf_stream.seekable():
             pdf_stream.seek(0)
 
-        filename = f"{self.name}{filename_suffix}"
-        _logger.info("Processing file: %s (suffix: %s)", filename, filename_suffix)
+        filename = f"{filename_prefix}.pdf"
+        _logger.info("Processing file: %s", filename)
 
         # Log all invitees for the calendar event
         invitees = self.partner_ids
         _logger.info("Invitees for calendar.event '%s': %s", self.name, [partner.name for partner in invitees])
 
         # Determine the confidentiality status
-        is_confidential = "NonConfidential" in filename_suffix
+        is_confidential = "NonConfidential" not in filename_prefix
         _logger.info("File confidentiality status: %s", "Confidential" if is_confidential else "Non-confidential")
 
         # Define groups for board members and board secretaries
@@ -1674,12 +1671,9 @@ class OdooCalendarInheritence(models.Model):
         ])
 
         # Correct invitee logic
-        if is_confidential:
-            partners_to_add = invitees.ids
-            _logger.info("Adding board members and secretaries as partners for confidential file.")
-        else:
-            partners_to_add = board_partners.ids
-            _logger.info("Adding invitees as partners for non-confidential file. Invitee IDs: %s", partners_to_add)
+        partners_to_add = invitees.ids if is_confidential else board_partners.ids
+        _logger.info("Adding partners for %s file. Partner IDs: %s",
+                     "confidential" if is_confidential else "non-confidential", partners_to_add)
 
         # Search for existing attachments
         existing_attachment = self.env['ir.attachment'].search([
@@ -1743,8 +1737,8 @@ class OdooCalendarInheritence(models.Model):
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
             '|',
-            ('name', 'ilike', '_NonConfidential'),
-            ('name', 'ilike', '_Confidential'),
+            ('name', 'ilike', 'Boardpack_NonConfidential'),
+            ('name', 'ilike', 'Boardpack_Confidential'),
         ]
 
         existing_attachments = self.env['ir.attachment'].search(domain)
@@ -1998,7 +1992,6 @@ class OdooCalendarInheritence(models.Model):
         """
         Merge attachments into two distinct documents:
         Confidential (all attachments) and Non-Confidential (excluding confidential attachments).
-        Stream the appropriate document based on user roles.
         """
         self.ensure_one()
 
@@ -2014,7 +2007,7 @@ class OdooCalendarInheritence(models.Model):
         self._generate_cover_html(company_logo_base64, confidential_article_body, is_confidential=True)
         confidential_cover_path = '/opt/confidential_cover.pdf'
 
-        # Generate non-confidential cover page if non_conf_article_body exists
+        # Generate non-confidential cover page if applicable
         non_confidential_cover_path = None
         if non_conf_article_body:
             self._generate_cover_html(company_logo_base64, non_conf_article_body, is_confidential=False)
@@ -2033,29 +2026,24 @@ class OdooCalendarInheritence(models.Model):
             )
             saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
-                filename_suffix="_Confidential.pdf",
+                filename_prefix=f"Boardpack_Confidential_{self.name}",
                 description=f"Confidential document for event {self.name}"
             )
 
-        # For Non-Confidential: Merge cover page with only non-confidential attachments (if applicable)
+        # For Non-Confidential: Merge cover page with only non-confidential attachments
         if non_confidential_cover_path:
             if non_confidential_attachments:
                 non_confidential_stream = self._merge_attachments(
                     non_confidential_cover_path, non_confidential_attachments
                 )
-                saved_documents["NonConfidential"] = self.save_merged_document(
-                    non_confidential_stream,
-                    filename_suffix="_NonConfidential.pdf",
-                    description=f"Non-confidential document for event {self.name}"
-                )
             else:
-                # Save the non-confidential cover page even if there are no attachments
                 non_confidential_stream = open(non_confidential_cover_path, 'rb')
-                saved_documents["NonConfidential"] = self.save_merged_document(
-                    non_confidential_stream,
-                    filename_suffix="_NonConfidential.pdf",
-                    description=f"Non-confidential document for event {self.name}"
-                )
+
+            saved_documents["NonConfidential"] = self.save_merged_document(
+                non_confidential_stream,
+                filename_prefix=f"Boardpack_NonConfidential_{self.name}",
+                description=f"Non-confidential document for event {self.name}"
+            )
 
         # Log details of saved documents
         _logger.info("Number of files saved: %d", len(saved_documents))
@@ -2064,13 +2052,8 @@ class OdooCalendarInheritence(models.Model):
                 _logger.info("Saved document: %s (Type: %s)", attachment.name, doc_type)
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
-
-        # Determine user access level
-        user_has_access = self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary') or \
-                          self.env.user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
         self.is_board_park = True
         action = self.action_open_boardpack()
-
         return action
 
     def action_merge_minutes_documents(self):
@@ -2107,7 +2090,7 @@ class OdooCalendarInheritence(models.Model):
         with open(confidential_cover_path, 'rb') as confidential_stream:
             saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
-                filename_suffix="_Minutes_Confidential.pdf",
+                filename_prefix=f"Minutes_Confidential_{self.name}",
                 description=f"Confidential minutes for event {self.name}"
             )
 
@@ -2116,7 +2099,7 @@ class OdooCalendarInheritence(models.Model):
             with open(non_confidential_cover_path, 'rb') as non_confidential_stream:
                 saved_documents["NonConfidential"] = self.save_merged_document(
                     non_confidential_stream,
-                    filename_suffix="_Minutes_NonConfidential.pdf",
+                    filename_prefix=f"Minutes_NonConfidential_{self.name}",
                     description=f"Non-confidential minutes for event {self.name}"
                 )
 
@@ -2140,7 +2123,7 @@ class OdooCalendarInheritence(models.Model):
         self.ensure_one()
 
         # Define the expected file name suffixes
-        filename_suffixes = ["_Minutes_Confidential.pdf", "_Minutes_NonConfidential.pdf"]
+        filename_suffixes = [f"Minutes_Confidential_{self.name}.pdf", f"Minutes_NonConfidential_{self.name}.pdf"]
 
         # Search for matching attachments
         attachments = self.env['ir.attachment'].search([

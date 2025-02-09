@@ -227,20 +227,20 @@
                         <!--                        />-->
 
                         <button name="action_merge_documents" type="object" string="Board Pack"
-                                invisible="not article_exists or is_minutes_created"
+                                invisible="not article_exists or is_minutes_created or is_board_park"
                                 class="btn btn-primary m-1" icon="fa-plus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
                         />
 
                         <button string="Confidential Agenda"
-                                invisible="not article_exists or is_minutes_created"
+                                invisible="not article_exists or is_minutes_created or is_board_park"
                                 name="action_view_knowledge_article" type="object"
                                 class="btn btn-info m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
 
                         <button string="Non-Confidential Agenda"
-                                invisible="not article_non_exists or is_minutes_created"
+                                invisible="not article_non_exists or is_minutes_created or is_board_park"
                                 name="action_non_confidential_view_knowledge_article" type="object"
                                 class="btn btn-success m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -251,7 +251,7 @@
                         <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
 
 
-                        <button string="Reset Agenda" invisible="not article_exists or is_minutes_created"
+                        <button string="Reset" invisible="not article_exists or is_minutes_created"
                                 name="delete_article" type="object"
                                 class="btn btn-danger m-1" icon="fa-minus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
@@ -259,7 +259,7 @@
 
                     </div>
                 </page>
-                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id">
+                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id or not is_board_park">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_confidential_minutes_uploaded" invisible="1"/>
@@ -306,8 +306,8 @@
                             <field name="email" widget="email"/>
                             <field name="phone" widget="phone"/>
                             <field name="position" widget="position"/>
-                            <!--                            <field name="is_board_member" string="Member Role"/>-->
-                            <!--                            <field name="is_board_secretary" string="Secretary Role"/>-->
+                            <field name="is_board_member" string="Member Role"/>
+                            <field name="is_board_secretary" string="Secretary Role"/>
 
                             <field name="has_attended" string="Attendend?" force_save="1"/>
                         </tree>
@@ -316,8 +316,9 @@
                     <button name="action_add_attendees" string="Mark Attendance" type="object" class="btn btn-primary"
                             confirm="Do you want to proceed ?" invisible="has_attendees_added"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
-                    <button name="action_reset_attendees" string="Reset Minutes" type="object"
+                    <button name="action_reset_attendees" string="Reset" type="object"
                             class="btn btn-danger m-1"
+                            invisible="not has_attendees_added"
                             confirm="Do you want to proceed ?"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
