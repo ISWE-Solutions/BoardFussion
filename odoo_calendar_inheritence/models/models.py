@@ -24,6 +24,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from xml.sax.saxutils import escape
 from weasyprint import HTML
+from datetime import datetime
 import subprocess
 import tempfile
 
@@ -123,6 +124,8 @@ class OdooCalendarInheritence(models.Model):
     # calendar_id = fields.Many2one('calendar.event.product.line', string="Calendar Event", required=True)
     non_conf_cover_page = fields.Char(help="this field is used in tracking non confidential cover page",
                                       string="Non confidential cover page")
+
+    from_agenda = fields.Char(string="Agenda From", default="Acting Board Secretary and Legal Council", store="True")
 
     bp_from = fields.Char(help="From field on Boardpark", default="Acting Board Secretary and Legal Counsel")
     Restricted = fields.Many2many(
@@ -447,10 +450,10 @@ class OdooCalendarInheritence(models.Model):
                 position = employee.job_id.name if employee and employee.job_id else "Unknown Position"
 
                 section += f"""
-                    <tr style="border: none;">
+                    <tr style="border: 1px 0px 0px 0px solid black;">
                         {"<td rowspan='{}' class='fw-bold' style='border: none;'>{}</td>".format(len(attendees), title) if idx == 0 else ""}
                         {"<td rowspan='{}' class='text-center' style='border: none;'>:</td>".format(len(attendees)) if idx == 0 else ""}
-                        <td style="border: none;">{attendee.name} <span class="text-muted">({position})</span></td>
+                        <td  style="border: none;">{attendee.name} <span class="text-muted">({position})</span></td>
                     </tr>
                 """
 
@@ -471,6 +474,11 @@ class OdooCalendarInheritence(models.Model):
 
         regular_attendees = [attendee for attendee in self.partner_ids if attendee not in board_attendees]
 
+        if self.start:
+            formatted_start_date = self.start.strftime('%d %B, %Y')
+        else:
+            formatted_start_date = ''
+
         shared_vars = {
             "logo_html": logo_html,
             "company_name": company_id.name,
@@ -481,8 +489,9 @@ class OdooCalendarInheritence(models.Model):
             "company_email": company_id.email or '',
             "company_website": company_id.website or '',
             "event_name": self.name,
-            "start_date": self.start_date or '',
+            "start_date": formatted_start_date,
             "organizer": self.user_id.name or '',
+            "from":self.from_agenda,
         }
 
         description_content = f"""
@@ -525,12 +534,14 @@ class OdooCalendarInheritence(models.Model):
                 <br>
                 <div class="container">
                     {description_content}
+                    <div style="border-bottom:2px solid black"> 
                     {board_attendees_content}
+                    </div
                     {regular_attendees_content}
                     <hr/>
-                    <p><strong> FROM:</strong></p>
-                    <p><strong>DATE:</strong>{start_date}</p>
-                    <p><strong>SUBJECT:</strong> {event_name}</p>
+                    <p> <strong> FROM:</strong> <span style="margin-left:0.5rem;"> {from} </span></p>
+                    <p><strong>DATE:</strong> <span style="margin-left:0.5rem;">{start_date}</span></p>
+                    <p><strong>SUBJECT:</strong><span style="margin-left:0.5rem;">{event_name}</span></p>
                     {agenda_content}
                     <p><strong></strong> {organizer}</p>
                 </div>
@@ -1135,25 +1146,6 @@ class OdooCalendarInheritence(models.Model):
                 'res_id': self.alternate_description_article_id.id,
                 'target': 'current',
             }
-
-    # def action_open_documents_minutes(self):
-    #     self.ensure_one()
-    #     upload_type = self.env.context.get('upload_type')
-    #     confidential = self.env.context.get('default_confidential', False)
-    #
-    #     return {
-    #         'type': 'ir.actions.act_window',
-    #         'name': 'Minutes Upload',
-    #         'res_model': 'calendar.event.minutes.line',
-    #         'view_mode': 'form',
-    #         'view_id': self.env.ref('odoo_calendar_inheritence.calendar_event_product_line_form_view_minutes').id,
-    #         'target': 'new',
-    #         'context': {
-    #             'default_calendar_id': self.id,
-    #             'default_confidential': confidential,
-    #             'upload_type': upload_type,  # Pass upload_type to context
-    #         },
-    #     }
 
     def action_open_documents_minutes(self):
         self.ensure_one()

@@ -259,7 +259,8 @@
 
                     </div>
                 </page>
-                <page name="minutes_of_meeting" string="Minutes of Meetings" invisible="not product_id or not is_board_park">
+                <page name="minutes_of_meeting" string="Minutes of Meetings"
+                      invisible="not product_id or not is_board_park">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_confidential_minutes_uploaded" invisible="1"/>
@@ -296,8 +297,6 @@
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
 
-
-
                     <group string="Meeting Attendees">
                     </group>
                     <field name="attendees_lines_ids" readonly="has_attendees_confirmed" widget="one2many">
@@ -306,8 +305,8 @@
                             <field name="email" widget="email"/>
                             <field name="phone" widget="phone"/>
                             <field name="position" widget="position"/>
-                            <field name="is_board_member" string="Member Role"/>
-                            <field name="is_board_secretary" string="Secretary Role"/>
+                            <!--                            <field name="is_board_member" string="Member Role"/>-->
+                            <!--                            <field name="is_board_secretary" string="Secretary Role"/>-->
 
                             <field name="has_attended" string="Attendend?" force_save="1"/>
                         </tree>
@@ -322,7 +321,8 @@
                             confirm="Do you want to proceed ?"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                    <button string="Confidential Minutes" invisible="not is_minutes_created or is_minutes_uploaded or is_minutes_published"
+                    <button string="Confidential Minutes"
+                            invisible="not is_minutes_created or is_minutes_uploaded or is_minutes_published"
                             name="action_view_description_article" type="object"
                             class="btn btn-info m-1" icon="fa-external-link"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
@@ -380,6 +380,11 @@
                            eval="not has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')"/>
             </xpath>
 
+            <xpath expr="//sheet/group[1]" position="before">
+                <group>
+                    <field name="from_agenda" invisible="not article_exists"/>
+                </group>
+            </xpath>
         </field>
     </record>
 
