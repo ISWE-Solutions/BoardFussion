@@ -1663,7 +1663,8 @@ class OdooCalendarInheritence(models.Model):
         ])
 
         # Correct invitee logic
-        partners_to_add = invitees.ids if is_confidential else board_partners.ids
+        # partners_to_add = invitees.ids if is_confidential else board_partners.ids
+        partners_to_add = board_partners.ids if is_confidential else invitees.ids
         _logger.info("Adding partners for %s file. Partner IDs: %s",
                      "confidential" if is_confidential else "non-confidential", partners_to_add)
 

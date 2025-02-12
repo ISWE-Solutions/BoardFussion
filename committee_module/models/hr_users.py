@@ -12,7 +12,7 @@ class User(models.Model):
         res = super(User, self).write(vals)
 
         # Fields to propagate
-        fields_to_sync = ['name', 'phone', 'mobile', 'email', 'job_description']
+        fields_to_sync = ['name', 'phone', 'mobile', 'work_email', 'job_description']
         for user in self:
             for field in fields_to_sync:
                 if field in vals:
