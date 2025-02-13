@@ -16,6 +16,11 @@ class Calendar_attendee(models.Model):
         help="Select or create an attendee role."
     )
 
+    def _send_mail_to_attendees(self, template):
+        # Overriding the email sending method to disable sending emails.
+        # Returning True to mimic a successful email send without doing anything.
+        return True
+
     def _send_custom_mail_to_attendees(self, mail_template, force_send=True):
         """ Send mail for event invitation to event attendees.
             :param mail_template: a mail.template record

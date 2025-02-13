@@ -11,6 +11,21 @@ class Department(models.Model):
     workspace_id = fields.Many2one("documents.folder", string="Workspace")
     document_count = fields.Integer(compute="_compute_document_count")
 
+    def _compute_total_employee(self):
+        result = {}
+        count_total_employee = 0
+        emp_data = self.env['hr.employee'].search([])
+
+        for department in self.ids:
+            for employee in emp_data:
+                for committee in employee.committees_ids:
+                    if committee.id == department:
+                        count_total_employee += 1
+            result[department] = count_total_employee
+            count_total_employee = 0
+        for department in self:
+            department.total_employee = result.get(department.id, 0)
+
     @api.model_create_multi
     def create(self, vals_list):
         for val in vals_list:

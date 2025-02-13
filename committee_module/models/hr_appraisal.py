@@ -6,6 +6,15 @@ class HrAppraisal(models.Model):
     committees_ids = fields.Many2many(related='employee_id.committees_ids')
     manager_ids = fields.Many2many('hr.employee', string='Evaluator')
     employee_feedback_published = fields.Boolean(string="Member Feedback Published", default=True, tracking=True)
+    view_evaluation = fields.Char(string='view evaluation')
+
+    def action_my_button(self):
+        # Your button logic here
+        # For example, you could return an action or perform some other action
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'reload',
+        }
 
     @api.model_create_multi
     def create(self, vals_list):

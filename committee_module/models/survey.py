@@ -35,14 +35,10 @@ class SurveyUserInput(models.Model):
         return '/survey/start/%s' % self.access_token
 
 
-class SurveyUserInputSub(models.Model):
-    _inherit = 'hr.appraisal'
-    view_evaluation = fields.Char(string='view evaluation')
+class SurveyEmployees(models.Model):
+    _inherit = "survey.survey"
 
-    def action_my_button(self):
-        # Your button logic here
-        # For example, you could return an action or perform some other action
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'reload',
-        }
+    survey_type = fields.Selection(selection_add=[
+        ('compliance', 'Voting'),
+    ], string="Survey Type", ondelete={'compliance': 'cascade'})
+

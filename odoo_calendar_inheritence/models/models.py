@@ -258,12 +258,10 @@ class OdooCalendarInheritence(models.Model):
     # ----------------------------------------------------------------------------
 
     def write(self, vals):
-        if 'name' in vals:
-            if self.project_id:
-                self.project_id.sudo().write({
-                    'name': vals['name']
-                })
-        res = super(OdooCalendarInheritence, self).write(vals)
+        if 'name' in vals and self.project_id:
+            self.project_id.sudo().write({'name': vals['name']})
+        # Disable email notifications by setting 'dont_notify' in context.
+        res = super(OdooCalendarInheritence, self.with_context(dont_notify=True)).write(vals)
         return res
 
     def update_article_calendar(self):
@@ -278,7 +276,6 @@ class OdooCalendarInheritence(models.Model):
     def _compute_article_non_exists(self):
         for record in self:
             record.article_non_exists = bool(record.non_confidential_article_id)
-
 
     def _get_src_data_b64(self, value):
         try:  # FIXME: maaaaaybe it could also take raw bytes?
@@ -464,15 +461,26 @@ class OdooCalendarInheritence(models.Model):
             """
             return section
 
+        non_secretary_attendees = [
+            attendee for attendee in self.partner_ids
+            if not any(user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+                       for user in attendee.user_ids)
+        ]
 
-        # Step 2: Separate attendees into board attendees and regular attendees
-        board_attendees = [attendee for attendee in self.partner_ids if attendee.user_ids and any(
-            user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
-            for user in attendee.user_ids if
-            not user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
-        )]
+        # From the non-secretary attendees, build the board attendees list
+        board_attendees = [
+            attendee for attendee in non_secretary_attendees
+            if attendee.user_ids and any(
+                user.has_group('odoo_calendar_inheritence.group_agenda_meeting_board_member')
+                for user in attendee.user_ids
+            )
+        ]
 
-        regular_attendees = [attendee for attendee in self.partner_ids if attendee not in board_attendees]
+        # Regular attendees are those that are in the non_secretary_attendees but not in board_attendees
+        regular_attendees = [
+            attendee for attendee in non_secretary_attendees
+            if attendee not in board_attendees
+        ]
 
         if self.start:
             formatted_start_date = self.start.strftime('%d %B, %Y')
@@ -534,16 +542,18 @@ class OdooCalendarInheritence(models.Model):
                 <br>
                 <div class="container">
                     {description_content}
-                    <div style="border-bottom:2px solid black"> 
+                    <div style="padding:1rem;"> 
                     {board_attendees_content}
-                    </div
+                    </div>
+                    <div style="padding:1rem;">
                     {regular_attendees_content}
+                    </div>
                     <hr/>
                     <p> <strong> FROM:</strong> <span style="margin-left:0.5rem;"> {from} </span></p>
                     <p><strong>DATE:</strong> <span style="margin-left:0.5rem;">{start_date}</span></p>
                     <p><strong>SUBJECT:</strong><span style="margin-left:0.5rem;">{event_name}</span></p>
                     {agenda_content}
-                    <p><strong></strong> {organizer}</p>
+                    <p><strong></strong> {from}</p>
                 </div>
             </div>
         """
@@ -976,7 +986,11 @@ class OdooCalendarInheritence(models.Model):
         # Classify attendees into two sections
         for attendee in self.attendees_lines_ids:
             if attendee.has_attended:
-                if attendee.is_board_member and not attendee.is_board_secretary:
+                # Skip board secretaries entirely
+                if attendee.is_board_secretary:
+                    continue
+                # Add board members (who are not secretaries) to PRESENT
+                if attendee.is_board_member:
                     attendees_present.append(attendee)
                 else:
                     attendees_in_attendance.append(attendee)
@@ -994,7 +1008,7 @@ class OdooCalendarInheritence(models.Model):
                         <col style="width: 75%;" /> <!-- Attendees column -->
                     </colgroup>
                     <tbody style="border:none;">
-                        <tr style="border:none;">
+                        <tr style="border:none; padding:1rem;">
                             <td rowspan="{len(attendees)}" class="fw-bold" style="border:none;">{title}</td>
                             <td rowspan="{len(attendees)}" class="text-center" style="border:none;">:</td>
                             <td style="border:none;">{attendees[0].attendee_name} <span class="text-muted" style="border:none">({attendees[0].position})</span></td>
@@ -1002,7 +1016,7 @@ class OdooCalendarInheritence(models.Model):
             """
             for attendee in attendees[1:]:
                 section += f"""
-                        <tr style="border:none;">
+                        <tr style="border:none; padding:1rem;">
                             <td style="border:none">{attendee.attendee_name} <span class="text-muted" style="border:none">({attendee.position})</span></td>
                         </tr>
                 """
@@ -1655,20 +1669,27 @@ class OdooCalendarInheritence(models.Model):
         board_member_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_member')
         board_secretary_group = self.env.ref('odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
 
-        # Fetch partners dynamically based on groups
-        board_partners = self.env['res.partner'].search([
+        # Fetch partners based on groups separately
+        board_members = self.env['res.partner'].search([
             ('user_ids.groups_id', 'in', board_member_group.id)
-        ]) | self.env['res.partner'].search([
+        ])
+        board_secretaries = self.env['res.partner'].search([
             ('user_ids.groups_id', 'in', board_secretary_group.id)
         ])
 
-        # Correct invitee logic
-        # partners_to_add = invitees.ids if is_confidential else board_partners.ids
-        partners_to_add = board_partners.ids if is_confidential else invitees.ids
+        if is_confidential:
+            # For confidential files, add both board members and board secretaries.
+            partners_to_add = (board_members | board_secretaries).ids
+        else:
+            # For non-confidential files, remove board members from invitees,
+            # but always include board secretaries.
+            non_board_invitees = invitees - board_members
+            partners_to_add = (non_board_invitees | board_secretaries).ids
+
         _logger.info("Adding partners for %s file. Partner IDs: %s",
                      "confidential" if is_confidential else "non-confidential", partners_to_add)
 
-        # Search for existing attachments
+        # Search for existing attachments for this event with the same filename
         existing_attachment = self.env['ir.attachment'].search([
             ('res_model', '=', 'calendar.event'),
             ('res_id', '=', self.id),
@@ -1692,7 +1713,7 @@ class OdooCalendarInheritence(models.Model):
 
         _logger.info("New attachment created: %s with ID: %d", merged_attachment.name, merged_attachment.id)
 
-        # Create or update `product.document`
+        # Create or update the corresponding `product.document`
         product_document = self.env['product.document'].search([('ir_attachment_id', '=', merged_attachment.id)],
                                                                limit=1)
         if not product_document:
@@ -2147,17 +2168,6 @@ class OdooCalendarInheritence(models.Model):
             _logger.warning("No product.document records found for deletion for event: %s", self.name)
 
         return True
-
-
-class AgendaLines(models.Model):
-    _name = 'agenda.lines'
-    _description = 'Agenda Lines'
-
-    calendar_id = fields.Many2one('calendar.event', string="Calendar")
-    description = fields.Html(related='calendar_id.agenda_description')
-    partner_ids = fields.Many2many('res.partner', string='Attendees')
-    duration = fields.Float(related="calendar_id.duration", string='Duration')
-    agenda_attachment_ids = fields.Many2many(comodel_name='ir.attachment', string="Attachments")
 
 
 
