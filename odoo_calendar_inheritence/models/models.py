@@ -4,6 +4,9 @@ from PyPDF2 import PdfReader, PdfWriter
 import re
 from markupsafe import Markup
 from bs4 import BeautifulSoup
+from io import BytesIO
+import base64
+import zipfile
 import base64
 import logging
 import io
@@ -15,16 +18,26 @@ from reportlab.lib.randomtext import subjects
 from lxml import etree
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
-from docx import Document
-import subprocess
 from reportlab.lib.utils import ImageReader
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowable, ListItem
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib.units import inch
+from io import StringIO, BytesIO
 from xml.sax.saxutils import escape
 from weasyprint import HTML
 from datetime import datetime
+import pandas as pd
+from reportlab.lib import colors
+from io import BytesIO
+import csv
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from docx import Document
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import subprocess
 import tempfile
 
@@ -102,7 +115,8 @@ class OdooCalendarInheritence(models.Model):
     article_id = fields.Many2one('knowledge.article', string='Related Article')
     non_confidential_article_id = fields.Many2one('knowledge.article', string='Related Article')
     description_article_id = fields.Many2one('knowledge.article', string='Related Description Article')
-    alternate_description_article_id = fields.Many2one('knowledge.article', string='Related NON-confidential Description Article')
+    alternate_description_article_id = fields.Many2one('knowledge.article',
+                                                       string='Related NON-confidential Description Article')
     task_created = fields.Boolean(string="Task Created", default=False)
     description = fields.Html(string="Description")
     attendees_lines_ids = fields.One2many('attendees.lines', 'calendar_id')
@@ -154,19 +168,28 @@ class OdooCalendarInheritence(models.Model):
         string="Employee Partners"
     )
     has_confidential_agenda_item = fields.Boolean(compute='_compute_has_confidential_agenda_item')
-    is_minutes_created = fields.Boolean(string = "Are minutes Generated")
+    is_minutes_created = fields.Boolean(string="Are minutes Generated")
     is_minutes_published = fields.Boolean(string="Are minutes published")
     is_minutes_uploaded = fields.Boolean(string="Are minutes Uploaded")
     is_boardpack_created = fields.Boolean(string="Are Boardpacks Generated")
-    create_text= fields.Char(string="true or false",  default="False")
+    create_text = fields.Char(string="true or false", default="False")
 
     is_confidential_minutes_uploaded = fields.Boolean(default=False)
     is_non_confidential_minutes_uploaded = fields.Boolean(default=False)
 
+    user_is_board_secretary = fields.Boolean(compute='_compute_user_is_board_secretary')
+
+    @api.depends_context('uid')
+    def _compute_user_is_board_secretary(self):
+        for event in self:
+            event.user_is_board_secretary = self.env.user.has_group(
+                'odoo_calendar_inheritence.group_agenda_meeting_board_secretary')
+
     @api.model
     def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
-        res = super(OdooCalendarInheritence, self).fields_view_get(view_id=view_id, view_type=view_type, toolbar=toolbar,
-                                                         submenu=submenu)
+        res = super(OdooCalendarInheritence, self).fields_view_get(view_id=view_id, view_type=view_type,
+                                                                   toolbar=toolbar,
+                                                                   submenu=submenu)
         if view_type == 'form' and res.get('fields', {}).get('product_line_ids'):
             doc = etree.XML(res['arch'])
             for node in doc.xpath("//field[@name='product_line_ids']"):
@@ -264,9 +287,6 @@ class OdooCalendarInheritence(models.Model):
         res = super(OdooCalendarInheritence, self.with_context(dont_notify=True)).write(vals)
         return res
 
-    def update_article_calendar(self):
-        return ""
-
     @api.depends('article_id')
     def _compute_article_exists(self):
         for record in self:
@@ -277,17 +297,17 @@ class OdooCalendarInheritence(models.Model):
         for record in self:
             record.article_non_exists = bool(record.non_confidential_article_id)
 
-    def _get_src_data_b64(self, value):
-        try:  # FIXME: maaaaaybe it could also take raw bytes?
-            image = Image.open(BytesIO(base64.b64decode(value)))
-            image.verify()
-
-        except IOError:
-            raise ValueError("Non-image binary fields can not be converted to HTML")
-        except:  # image.verify() throws "suitable exceptions", I have no idea what they are
-            raise ValueError("Invalid image content")
-
-        return "data:%s;base64,%s" % (Image.MIME[image.format], value.decode('ascii'))
+    # def _get_src_data_b64(self, value):
+    #     try:  # FIXME: maaaaaybe it could also take raw bytes?
+    #         image = Image.open(BytesIO(base64.b64decode(value)))
+    #         image.verify()
+    #
+    #     except IOError:
+    #         raise ValueError("Non-image binary fields can not be converted to HTML")
+    #     except:  # image.verify() throws "suitable exceptions", I have no idea what they are
+    #         raise ValueError("Invalid image content")
+    #
+    #     return "data:%s;base64,%s" % (Image.MIME[image.format], value.decode('ascii'))
 
     def delete_article(self):
         """ Deletes the linked article and its non-confidential copy if they exist. """
@@ -499,7 +519,7 @@ class OdooCalendarInheritence(models.Model):
             "event_name": self.name,
             "start_date": formatted_start_date,
             "organizer": self.user_id.name or '',
-            "from":self.from_agenda,
+            "from": self.from_agenda,
         }
 
         description_content = f"""
@@ -576,7 +596,7 @@ class OdooCalendarInheritence(models.Model):
         })
         self.article_id = article.id
 
-        if self.has_confidential_agenda_item :
+        if self.has_confidential_agenda_item:
             non_confidential_body = base_content.format(
                 confidential_header="",
                 description_content=description_content,
@@ -593,208 +613,6 @@ class OdooCalendarInheritence(models.Model):
             self.non_confidential_article_id = non_conf_article.id
         else:
             self.non_confidential_article_id = False
-
-    def update_attendees_in_article(self):
-        """
-        Add Board Members and Regular Attendees sections above the Agenda header in an existing article.
-        Provides success or failure notifications.
-        """
-        try:
-            # Ensure an article is already created
-            if not self.article_id:
-                raise ValidationError("No article found! Please create an article first.")
-
-            # Fetch attendees: Board members and regular attendees
-            board_attendees = []
-            regular_attendees = []
-
-            for attendee in self.partner_ids:
-                if attendee.is_board_member or attendee.is_board_secretary:
-                    board_attendees.append(attendee)
-                else:
-                    regular_attendees.append(attendee)
-
-            # Generate Board Members Section
-            board_attendees_content = ""
-            if board_attendees:
-                board_attendees_content += "<div><h3>TO:</h3>"
-                for attendee in board_attendees:
-                    position = f" ({attendee.position})" if attendee.position else ""
-                    board_attendees_content += f"<p>{attendee.attendee_name} {position}</p>"
-                board_attendees_content += "</div><hr/>"
-
-            # Generate Regular Attendees Section
-            regular_attendees_content = ""
-            if regular_attendees:
-                regular_attendees_content += "<div><h3>CC:</h3>"
-                for attendee in regular_attendees:
-                    position = f" ({attendee.position})" if attendee.position else ""
-                    regular_attendees_content += f"<p>{attendee.attendee_name} {position}</p>"
-                regular_attendees_content += "</div><hr/>"
-
-            # Combine both sections
-            attendees_content = board_attendees_content + regular_attendees_content
-
-            # Parse the existing article body using BeautifulSoup
-            existing_body = self.article_id.body
-            soup = BeautifulSoup(existing_body, 'html.parser')
-
-            # Find the Agenda header
-            agenda_header = soup.find('h3', string="Agenda")
-            if agenda_header:
-                # Insert attendees' content before the Agenda header
-                attendees_soup = BeautifulSoup(attendees_content, 'html.parser')
-                agenda_header.insert_before(attendees_soup)
-            else:
-                # Fallback: Append attendees' content at the end
-                attendees_soup = BeautifulSoup(attendees_content, 'html.parser')
-                soup.append(attendees_soup)
-
-            # Update the article with the modified body
-            new_body_content = str(soup)
-            self.article_id.sudo().write({'body': Markup(new_body_content)})
-
-            # Update timestamps
-            self.last_write_date = fields.Datetime.now()
-            self.last_write_count = len(self.attendees_lines_ids)
-
-            # Return a success notification
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Success',
-                    'message': 'Attendees successfully updated in the article!',
-                    'type': 'success',  # 'success', 'warning', 'danger'
-                    'sticky': False,  # Notification disappears after a few seconds
-                }
-            }
-
-        except ValidationError as e:
-            raise UserError(f"Error: {e}")
-
-        except Exception as e:
-            raise UserError(f"An unexpected error occurred: {e}")
-
-    def update_agenda_lines(self):
-        """
-        Updates the agenda lines in the article body.
-        Provides success or failure notifications.
-        """
-        try:
-            # Check for product line ids
-            if not self.product_line_ids:
-                raise ValidationError("Please add an agenda before making an Article!")
-
-            # Construct the HTML table
-            html_content = Markup("""
-                <table class="table">
-                    <thead style="display:none">
-                        <tr style="border: 0px; background-color: #ffffff;">
-                            <th style="padding: 10px; border: 0px;">ID</th>
-                            <th style="padding: 10px; border: 0px;">Agenda Item</th>
-                            <th style="padding: 10px; border: 0px;">Presenter</th>
-                        </tr>
-                    </thead>
-                    <tbody id="article_body">
-            """)
-
-            counter = 1
-            for line in self.product_line_ids:
-                presenters = ', '.join(presenter.name for presenter in line.presenter_id)
-                html_content += Markup("""
-                    <tr style="border: none;">
-                        <td style="padding: 10px; border: 0px;">{counter}</td>
-                        <td style="padding: 10px; border: 0px;">{description}</td>
-                        <td style="padding: 10px; border: 0px;">{presenters}</td>
-                    </tr>
-                """).format(
-                    counter=counter,
-                    description=line.description or '',
-                    presenters=presenters or ''
-                )
-                counter += 1
-
-            html_content += Markup("</tbody></table>")
-
-            # Get the existing article
-            article = self.env['knowledge.article'].sudo().browse(self.article_id.id)
-
-            # Update the article body
-            body_content = article.body
-            start_index = body_content.find('<h3>Agenda</h3>')
-            end_index = body_content.find('</table>', start_index)
-
-            if start_index == -1 or end_index == -1:
-                raise ValidationError("Failed to update article: Agenda section not found.")
-
-            body_content = body_content[:start_index + len('<h3>Agenda</h3>')] + html_content + body_content[
-                                                                                                end_index + len(
-                                                                                                    '</table>'):]
-
-            # Update article body
-            article.body = body_content
-            self.last_write_count = len(self.product_line_ids)
-            self.last_write_date = fields.Datetime.now()
-
-            # Return a success notification
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Success',
-                    'message': 'Agenda successfully updated in the article!',
-                    'type': 'success',  # can be 'success', 'warning', or 'danger'
-                    'sticky': False,  # Notification disappears after a few seconds
-                }
-            }
-
-        except ValidationError as e:
-            raise UserError(f"Error: {e}")
-
-        except Exception as e:
-            raise UserError(f"An unexpected error occurred: {e}")
-
-    def cover_page_update(self):
-        """
-        Updates the cover page by:
-        1. Removing existing attendees.
-        2. Adding updated attendees.
-        3. Updating agenda lines.
-        Provides success or failure notifications.
-        """
-        try:
-            # Step 1: Remove existing attendees
-            self.remove_attendees_from_article()
-
-            # Step 2: Add updated attendees
-            self.update_attendees_in_article()
-
-            # Step 3: Update agenda lines
-            self.update_agenda_lines()
-
-            # Update timestamps
-            self.last_write_date = fields.Datetime.now()
-
-            # Success notification
-            return {
-                'type': 'ir.actions.client',
-                'tag': 'display_notification',
-                'params': {
-                    'title': 'Success',
-                    'message': 'Cover page has been successfully updated!',
-                    'type': 'success',  # Notification type
-                    'sticky': False,  # Auto-dismiss notification
-                }
-            }
-
-        except UserError as e:
-            # Handle any known validation or user errors
-            raise UserError(f"Error: {e}")
-
-        except Exception as e:
-            # Handle unexpected errors
-            raise UserError(f"An unexpected error occurred: {e}")
 
     def action_add_knowledge_article(self):
         if not self.article_id:
@@ -1285,7 +1103,6 @@ class OdooCalendarInheritence(models.Model):
             else:
                 position = 'Unknown Position'
 
-
                 # Debugging output
             _logger.info(
                 f"Partner: {partner.name}, Employee: {employee.name if employee else 'None'}, Position: {position}")
@@ -1416,7 +1233,6 @@ class OdooCalendarInheritence(models.Model):
         # Fetch uploaded attachments from related minutes lines
         minutes_lines = self.env['calendar.event.minutes.line'].search([('calendar_id', '=', self.id)])
         uploaded_attachment_ids = minutes_lines.mapped('pdf_attachment').ids
-
 
         # Combine attachments from both sources
         all_accessible_attachment_ids = list(set(accessible_attachment_ids + uploaded_attachment_ids))
@@ -1785,42 +1601,299 @@ class OdooCalendarInheritence(models.Model):
 
     def _merge_attachments(self, cover_file_path, attachments):
         """
-        Merge the cover file (from disk) with provided attachments.
+        Merge the cover file (from disk) with provided attachments, converting non-PDF files to PDF.
+        Returns a tuple: (merged_stream, failed_attachments)
         """
         from PyPDF2 import PdfWriter, PdfReader
         from io import BytesIO
         import base64
+        import logging
 
+        _logger = logging.getLogger(__name__)
         self.ensure_one()
-        merged_stream = BytesIO()  # Initialize in-memory buffer for the final merged PDF
+        merged_stream = BytesIO()
         pdf_writer = PdfWriter()
-        pdf_writer.compress_content = False  # Ensure no compression is applied
+        pdf_writer.compress_content = False
 
-        # Add all pages of the cover file
+        # Add cover file
         try:
             cover_reader = PdfReader(cover_file_path)
             for page in cover_reader.pages:
                 pdf_writer.add_page(page)
         except Exception as e:
-            _logger.error(f"Error reading cover file at {cover_file_path}: {e}")
+            _logger.error(f"Error reading cover file: {e}")
             raise UserError(_("Failed to read the cover file: %s") % cover_file_path)
 
-        # Process and add attachments
+        failed_attachments = []  # Collect errors here
+
+        # Process attachments
         for attachment in attachments:
             try:
                 attachment_data = base64.b64decode(attachment.datas)
-                attachment_reader = PdfReader(BytesIO(attachment_data))
+                mime_type = attachment.mimetype
+                file_name = (attachment.name or '').lower()
 
-                for page in attachment_reader.pages:
+                # Check if conversion is needed
+                if mime_type == 'application/pdf':
+                    pdf_data = attachment_data
+                else:
+                    pdf_data = self._convert_to_pdf(attachment_data, mime_type, file_name)
+
+                # Add pages from PDF data
+                reader = PdfReader(BytesIO(pdf_data))
+                for page in reader.pages:
                     pdf_writer.add_page(page)
             except Exception as e:
-                _logger.error(f"Error processing attachment: {e}")
-                raise UserError(_("Failed to process an attachment."))
+                _logger.error(f"Error processing attachment {attachment.name}: {e}")
+                # Instead of raising an error, collect the error details:
+                ext = attachment.name.split('.')[-1] if '.' in attachment.name else 'unknown'
+                failed_attachments.append({
+                    'name': attachment.name,
+                    'extension': ext,
+                    'error_message': str(e),
+                })
+                # Continue processing the remaining attachments
+                continue
 
-        # Write the final merged PDF to the in-memory buffer
         pdf_writer.write(merged_stream)
         merged_stream.seek(0)
-        return merged_stream
+        return merged_stream, failed_attachments
+
+    def _convert_to_pdf(self, data, mime_type, file_name):
+        """Convert non-PDF data to PDF based on MIME type or file extension."""
+        conversion_map = {
+            'image/png': self._convert_image_to_pdf,
+            'image/jpeg': self._convert_image_to_pdf,
+            'image/gif': self._convert_image_to_pdf,
+            'image/bmp': self._convert_image_to_pdf,
+            'text/csv': self._convert_csv_to_pdf,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': self._convert_xlsx_to_pdf,
+            'application/vnd.ms-excel': self._convert_xls_to_pdf,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': self._convert_docx_to_pdf,
+        }
+
+        # Determine converter
+        if mime_type in conversion_map:
+            return conversion_map[mime_type](data)
+        elif file_name.endswith('.csv'):
+            return self._convert_csv_to_pdf(data)
+        elif file_name.endswith('.xlsx'):
+            return self._convert_xlsx_to_pdf(data)
+        elif file_name.endswith('.xls'):
+            return self._convert_xls_to_pdf(data)
+        elif file_name.endswith('.docx'):
+            return self._convert_docx_to_pdf(data)
+        elif file_name.endswith('.pptx'):
+            return self._convert_pptx_to_pdf(data)
+        elif any(file_name.endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+            return self._convert_image_to_pdf(data)
+        else:
+            raise UserError(_("Unsupported file type: %s") % file_name)
+
+    def _convert_image_to_pdf(self, image_data):
+        from PIL import Image
+        from io import BytesIO
+        img = Image.open(BytesIO(image_data))
+        pdf_buffer = BytesIO()
+        img.save(pdf_buffer, format='PDF')
+        return pdf_buffer.getvalue()
+
+    def _convert_csv_to_pdf(self, csv_data):
+        import csv
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+        from io import StringIO
+
+        csv_content = csv_data.decode('utf-8')  # Decode bytes to string
+        reader = csv.reader(StringIO(csv_content))
+        data = list(reader)
+
+        if not data:
+            raise ValueError("CSV file is empty")
+
+        num_columns = len(data[0])
+
+        # Choose orientation: Landscape for many columns, otherwise Portrait
+        page_size = landscape(letter) if num_columns > 6 else letter
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=page_size, leftMargin=20, rightMargin=20, topMargin=20,
+                                bottomMargin=20)
+
+        # Calculate max column widths (based on longest content in each column)
+        max_col_widths = [max(len(str(row[i])) for row in data) * 5 for i in range(num_columns)]
+
+        # Limit column widths to fit the page
+        max_page_width = doc.width  # Available width for content
+        total_width = sum(max_col_widths)
+
+        # Scale down column widths if they exceed page width
+        if total_width > max_page_width:
+            scale_factor = max_page_width / total_width
+            col_widths = [w * scale_factor for w in max_col_widths]
+            font_size = 6  # Reduce font size if scaling is needed
+        else:
+            col_widths = max_col_widths
+            font_size = 8  # Default font size
+
+        # Create table
+        table = Table(data, colWidths=col_widths)
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), font_size),  # Adjusted dynamically
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('WORDWRAP', (0, 0), (-1, -1)),  # Ensure text wraps inside columns
+        ])
+        table.setStyle(style)
+
+        doc.build([table])
+        return pdf_buffer.getvalue()
+
+    def _convert_xlsx_to_pdf(self, xlsx_data):
+        import pandas as pd
+        from io import BytesIO
+        # Read the Excel file into a DataFrame
+        df = pd.read_excel(BytesIO(xlsx_data), engine='openpyxl')
+        # Convert DataFrame to list-of-lists with header as first row
+        data = [df.columns.tolist()] + df.values.tolist()
+        return self._generate_pdf_from_table(data)
+
+    def _generate_pdf_from_table(self, data):
+        if not data:
+            raise UserError(_("No data to generate PDF."))
+
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet
+        from io import BytesIO
+
+        num_columns = len(data[0])
+        # Use landscape orientation if there are more than 6 columns
+        page_size = landscape(letter) if num_columns > 6 else letter
+
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer,
+                                pagesize=page_size,
+                                leftMargin=20,
+                                rightMargin=20,
+                                topMargin=20,
+                                bottomMargin=20)
+        available_width = doc.width  # Content width available after margins
+
+        # Prepare raw text data (for width calculations)
+        raw_data = [[str(cell) for cell in row] for row in data]
+
+        # --- Determine Natural Column Widths & Font Size ---
+        # We use a multiplier (points per character) to approximate width.
+        # For a default font size of 10, try multiplier = 6.
+        multiplier = 6
+        natural_widths = [
+            max(len(raw_data[row][col]) for row in range(len(raw_data))) * multiplier
+            for col in range(num_columns)
+        ]
+        total_natural = sum(natural_widths)
+
+        # If the total natural width exceeds the available width,
+        # we reduce the font size (and multiplier) so more content fits.
+        if total_natural > available_width:
+            default_font_size = 6
+            multiplier = 3.6  # Adjust multiplier for the smaller font
+            natural_widths = [
+                max(len(raw_data[row][col]) for row in range(len(raw_data))) * multiplier
+                for col in range(num_columns)
+            ]
+            total_natural = sum(natural_widths)
+        else:
+            default_font_size = 10
+
+        # Scale each column so that the table fills the available page width.
+        scale_factor = available_width / total_natural if total_natural > 0 else 1
+        col_widths = [w * scale_factor for w in natural_widths]
+
+        # --- Convert cell content to Paragraphs for proper wrapping ---
+        styles = getSampleStyleSheet()
+        cell_style = styles["Normal"]
+        cell_style.fontSize = default_font_size
+        cell_style.leading = default_font_size * 1.2  # Slightly more than font size
+
+        wrapped_data = []
+        for row in data:
+            wrapped_row = []
+            for cell in row:
+                # Each cell becomes a Paragraph so that long text wraps automatically.
+                wrapped_row.append(Paragraph(str(cell), cell_style))
+            wrapped_data.append(wrapped_row)
+
+        # --- Create and Style the Table ---
+        table = Table(wrapped_data, colWidths=col_widths)
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+        ])
+        table.setStyle(style)
+
+        doc.build([table])
+        return pdf_buffer.getvalue()
+
+    def _convert_xls_to_pdf(self, xls_data):
+        try:
+            df = pd.read_excel(BytesIO(xls_data), engine='xlrd')  # Legacy Excel
+            if df.empty:
+                raise ValueError("XLS file is empty")
+
+            data = [df.columns.values.tolist()] + df.values.tolist()
+
+            pdf_buffer = BytesIO()
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=landscape(letter))
+
+            # Auto-adjust column widths
+            col_widths = [max(len(str(row[i])) for row in data) * 6 for i in range(len(data[0]))]
+            col_widths = [min(w, 2 * inch) for w in col_widths]
+
+            table = Table(data, colWidths=col_widths)
+            style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.lightgrey, colors.white])
+            ])
+            table.setStyle(style)
+
+            doc.build([table])
+            return pdf_buffer.getvalue()
+
+        except Exception as e:
+            raise ValueError(f"XLS conversion failed: {str(e)}")
+
+    def _convert_docx_to_pdf(self, docx_data):
+        # Create temp files
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_docx:
+            temp_docx.write(docx_data)
+            temp_docx.flush()
+
+            output_pdf = temp_docx.name.replace(".docx", ".pdf")
+
+            # Convert DOCX to PDF using LibreOffice
+            cmd = ["soffice", "--headless", "--convert-to", "pdf", "--outdir", tempfile.gettempdir(), temp_docx.name]
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+            # Read the generated PDF
+            with open(output_pdf, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
+
+        return pdf_data
 
     def _generate_cover_html(self, company_logo_base64, article_body, is_confidential=True):
         """
@@ -2009,7 +2082,7 @@ class OdooCalendarInheritence(models.Model):
         """
         self.ensure_one()
 
-        # Generate the confidential and non-confidential cover HTML and save as PDFs
+        # Generate the cover pages and get their file paths
         company_logo_base64 = self.env.company.logo or None
         confidential_article_body = self.article_id.body if self.article_id else None
         non_conf_article_body = self.non_confidential_article_id.body if self.non_confidential_article_id else None
@@ -2031,13 +2104,15 @@ class OdooCalendarInheritence(models.Model):
         confidential_attachments, non_confidential_attachments = self._classify_attachments()
 
         saved_documents = {}
+        all_failed_errors = []
 
         # For Confidential: Merge cover page with all attachments
         if confidential_attachments or non_confidential_attachments or not (
                 confidential_attachments and non_confidential_attachments):
-            confidential_stream = self._merge_attachments(
+            confidential_stream, confidential_errors = self._merge_attachments(
                 confidential_cover_path, confidential_attachments + non_confidential_attachments
             )
+            all_failed_errors += confidential_errors
             saved_documents["Confidential"] = self.save_merged_document(
                 confidential_stream,
                 filename_prefix=f"Boardpack_Confidential_{self.name}",
@@ -2047,11 +2122,13 @@ class OdooCalendarInheritence(models.Model):
         # For Non-Confidential: Merge cover page with only non-confidential attachments
         if non_confidential_cover_path:
             if non_confidential_attachments:
-                non_confidential_stream = self._merge_attachments(
+                non_confidential_stream, non_confidential_errors = self._merge_attachments(
                     non_confidential_cover_path, non_confidential_attachments
                 )
             else:
                 non_confidential_stream = open(non_confidential_cover_path, 'rb')
+                non_confidential_errors = []
+            all_failed_errors += non_confidential_errors
 
             saved_documents["NonConfidential"] = self.save_merged_document(
                 non_confidential_stream,
@@ -2059,7 +2136,6 @@ class OdooCalendarInheritence(models.Model):
                 description=f"Non-confidential document for event {self.name}"
             )
 
-        # Log details of saved documents
         _logger.info("Number of files saved: %d", len(saved_documents))
         for doc_type, attachment in saved_documents.items():
             if attachment:
@@ -2067,6 +2143,29 @@ class OdooCalendarInheritence(models.Model):
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
         self.is_board_park = True
+
+        # If there were any errors, open a wizard to notify the user.
+        if all_failed_errors:
+            error_details = "<ul>" + "".join(
+                f"<li>Attachment: {err['name']} (Extension: {err['extension']}) - {err['error_message']}</li>"
+                for err in all_failed_errors
+            ) + "</ul>"
+            wizard = self.env['merge.error.wizard'].create({
+                'error_message': error_details,
+                # Optionally pass next action context if needed.
+            })
+
+            return {
+                'name': _('Merge Errors'),
+                'view_mode': 'form',
+                'view_id': self.env.ref('odoo_calendar_inheritence.merge_error_wizard_form_view').id,
+                'res_model': 'merge.error.wizard',
+                'res_id': wizard.id,
+                'type': 'ir.actions.act_window',
+                'target': 'new',
+            }
+
+        # No errors: continue with the process flow.
         action = self.action_open_boardpack()
         return action
 
@@ -2129,6 +2228,10 @@ class OdooCalendarInheritence(models.Model):
         self.is_minutes_published = True
         return self.action_open_minutes()
 
+    def action_publish_upload_minutes_documents(self):
+        self.is_minutes_published = True
+        return self.action_open_minutes()
+
     def action_delete_minutes_documents(self):
         """
         Delete the saved confidential and non-confidential minutes documents
@@ -2170,4 +2273,13 @@ class OdooCalendarInheritence(models.Model):
         return True
 
 
+class MergeErrorWizard(models.TransientModel):
+    _name = 'merge.error.wizard'
+    _description = 'Merge Error Notification'
 
+    error_message = fields.Text(string="Merge Errors", readonly=True)
+
+    def action_continue(self):
+        """Called when the user clicks the Continue button."""
+        # Return the next action. For example, if you need to open the boardpack:
+        return self.env.context.get('next_action') or {'type': 'ir.actions.act_window_close'}

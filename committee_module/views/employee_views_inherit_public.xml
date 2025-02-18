@@ -15,7 +15,9 @@
                 </xpath>
                 <xpath expr="//button[@name='action_send_appraisal_request']" position="attributes">
                     <attribute name="string">Request Evaluation</attribute>
+                    <attribute name="groups">odoo_calendar_inheritence.group_agenda_meeting_board_secretary</attribute>
                 </xpath>
+
                 <xpath expr="//field[@name='address_id']" position="attributes">
                     <attribute name="domain">[]</attribute>
                 </xpath>
@@ -59,9 +61,9 @@
                 <xpath expr="//label[@for='name']" position="attributes">
                     <attribute name="string">Name</attribute>
                 </xpath>
-<!--                <xpath expr="//page[@name='received_badges']" position="attributes">-->
-<!--                    <attribute name="invisible">1</attribute>-->
-<!--                </xpath>-->
+                <!--                <xpath expr="//page[@name='received_badges']" position="attributes">-->
+                <!--                    <attribute name="invisible">1</attribute>-->
+                <!--                </xpath>-->
             </field>
         </record>
 
@@ -75,7 +77,7 @@
             <field name="search_view_id" ref="hr.hr_employee_public_view_search"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
-                    Add a new employee
+                    Add a new Member
                 </p>
                 <p>
                     With just a quick glance on the Board Fusion Members screen, you

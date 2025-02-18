@@ -183,7 +183,9 @@
             </xpath>
 
             <xpath expr="//page[@name='page_invitations']" position="after">
-                <page name="agenda" string="Meeting Agenda" invisible="not product_id">
+                <field name="is_board_park" invisible="1"/>
+                <page name="agenda" string="Meeting Agenda"
+                      invisible="not product_id or ((not is_board_park) and not user_is_board_secretary)">
                     <field name="product_line_ids" widget="one2many"
                            readonly="has_attendees_added"
                            context="{'form_view_ref': 'odoo_calendar_inheritence.calendar_event_product_line_form_view', 'hide_title': True}">
@@ -245,13 +247,8 @@
                                 class="btn btn-success m-1" icon="fa-external-link"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
 
-                        <!--                        <button string="Update Agenda" invisible="not article_exists"-->
-                        <!--                                name="cover_page_update" type="object"-->
-                        <!--                                class="btn btn-success m-1" icon="fa-plus"-->
-                        <!--                                groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>-->
-
-
-                        <button string="Reset" invisible="not article_exists or is_minutes_created"
+                        <button string="Reset"
+                                invisible="not article_exists or is_minutes_created or has_attendees_added"
                                 name="delete_article" type="object"
                                 class="btn btn-danger m-1" icon="fa-minus"
                                 groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"
@@ -259,8 +256,9 @@
 
                     </div>
                 </page>
+                <field name="user_is_board_secretary" invisible="1"/>
                 <page name="minutes_of_meeting" string="Minutes of Meetings"
-                      invisible="not product_id or not is_board_park">
+                      invisible="(not product_id or not is_board_park) or ((not is_minutes_published) and not user_is_board_secretary)">
                     <field name="has_attendees_added" invisible="1"/>
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_confidential_minutes_uploaded" invisible="1"/>
@@ -339,10 +337,28 @@
                             class="btn btn-success m-1"
                             invisible="not is_minutes_created or is_minutes_uploaded or is_minutes_published"
                             groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
+                    <button name="action_publish_upload_minutes_documents"
+                            string="Publish Minutes"
+                            type="object"
+                            class="btn btn-success m-1"
+                            invisible="not is_minutes_uploaded or is_minutes_published"
+                            groups="odoo_calendar_inheritence.group_agenda_meeting_board_secretary"/>
                 </page>
             </xpath>
         </field>
     </record>
+
+<!--    <record id="view_calendar_event_form_inherit_readonly" model="ir.ui.view">-->
+<!--        <field name="name">calendar.event.form.inherit.readonly.before.notebook</field>-->
+<!--        <field name="model">calendar.event</field>-->
+<!--        <field name="inherit_id" ref="calendar.view_calendar_event_form"/>-->
+<!--        <field name="arch" type="xml">-->
+<!--            &lt;!&ndash; Target ALL fields in the sheet's groups (before the notebook) &ndash;&gt;-->
+<!--            <xpath expr="//sheet/group//field" position="attributes">-->
+<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
+<!--            </xpath>-->
+<!--        </field>-->
+<!--    </record>-->
 
 
     <record id="calendar_event_product_line_form_view_extended" model="ir.ui.view">

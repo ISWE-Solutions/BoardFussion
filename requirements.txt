@@ -5,3 +5,7 @@ pyncclient
 boto3
 nextcloud-api-wrapper
 paramiko
+pandas
+python-pptx
+xlrd==1.2.0
+libreoffice

@@ -140,6 +140,10 @@ class CalendarEventMinutesLine(models.Model):
 
         try:
             for record in self:
+                # Determine the name based on confidentiality
+                # Make sure you have a field named 'confidential' (or similar) in your model
+                file_name = 'Minutes_Confidential_upload' if record.confidential else 'Minutes_NonConfidential_upload'
+
                 if not record.product_id:
                     record.product_id = record.calendar_id.product_id.id
 
@@ -149,7 +153,7 @@ class CalendarEventMinutesLine(models.Model):
                 if not record.product_document_id:
                     new_document = document_model.sudo().create({
                         'res_model': 'product.template',
-                        'name': product.display_name,
+                        'name': file_name,  # Use the conditional file name here
                         'res_id': product.id,
                     })
                     record.product_document_id = new_document.id
@@ -175,7 +179,7 @@ class CalendarEventMinutesLine(models.Model):
                             restricted_partner_ids = list(set(record.Restricted.ids))
                             new_document = document_model.sudo().create({
                                 'res_model': 'product.template',
-                                'name': attachment.name,
+                                'name': file_name,  # Use the conditional file name here too
                                 'res_id': product.id,
                                 'ir_attachment_id': attachment.id,
                                 'partner_ids': [(6, 0, restricted_partner_ids)]
@@ -188,7 +192,6 @@ class CalendarEventMinutesLine(models.Model):
                 # Set is_minutes_created to True on the associated calendar.event
                 if record.calendar_id and not record.calendar_id.is_minutes_created:
                     record.calendar_id.is_minutes_uploaded = True
-                    record.calendar_id.is_minutes_published = True
                     _logger.info(f"Set is_minutes_created to True for Calendar Event {record.calendar_id.id}")
 
         except Exception as e:

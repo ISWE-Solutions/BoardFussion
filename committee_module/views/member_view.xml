@@ -69,7 +69,6 @@
             <field name="arch" type="xml">
                 <xpath expr="//kanban" position="attributes">
                     <attribute name="group_create">false</attribute>
-
                 </xpath>
             </field>
         </record>
