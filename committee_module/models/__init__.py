@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from . import models
 from . import hr_employee
 from . import hr_department
 from . import documents_folder
@@ -10,4 +9,4 @@ from . import hr_users
 from . import hr_contract
 from . import project_task
 from . import res_partner
-# from . import hr_employee_delete_wizard
+from . import hr

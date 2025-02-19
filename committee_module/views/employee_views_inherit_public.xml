@@ -67,14 +67,38 @@
             </field>
         </record>
 
-        <record id="hr_employee_public_action" model="ir.actions.act_window">
-            <field name="name">Custom Member</field>
+        <record id="hr_employee_public_view_search_inherited" model="ir.ui.view">
+            <field name="name">hr.employee.search</field>
+            <field name="model">hr.employee.public</field>
+            <field name="arch" type="xml">
+                <search string="Employees">
+                    <field name="name" string="Members" filter_domain="['|',('work_email','ilike',self),('name','ilike',self)]"/>
+                    <field name="parent_id" string="Manager"/>
+                    <field name="job_title"/>
+                    <separator/>
+                    <filter name="my_team" string="My Team" domain="[('parent_id.user_id', '=', uid)]"/>
+                    <filter name="my_department" string="My Department" domain="[('member_of_department', '=', True)]"/>
+                    <separator/>
+                    <filter name="newly_hired" string="Newly Hired" domain="[('newly_hired', '=', True)]"/>
+                    <separator/>
+                    <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_manager" string="Manager" domain="[]" context="{'group_by':'parent_id'}"/>
+                        <filter name="group_department" string="Department" domain="[]" context="{'group_by':'department_id'}"/>
+                        <filter name="group_company" string="Company" domain="[]" context="{'group_by':'company_id'}"/>
+                    </group>
+                </search>
+             </field>
+        </record>
+
+        <record id="hr_employee_public_action_inherited" model="ir.actions.act_window">
+            <field name="name">Members</field>
             <field name="res_model">hr.employee.public</field>
             <field name="view_mode">kanban,tree,form</field>
             <field name="domain">[]</field>
             <field name="context">{'chat_icon': True}</field>
             <field name="view_id" eval="False"/>
-            <field name="search_view_id" ref="hr.hr_employee_public_view_search"/>
+            <field name="search_view_id" ref="committee_module.hr_employee_public_view_search_inherited"/>
             <field name="help" type="html">
                 <p class="o_view_nocontent_smiling_face">
                     Add a new Member
@@ -85,6 +109,12 @@
                     contact data, job position, availability, etc.
                 </p>
             </field>
+        </record>
+
+
+        <record id="hr.menu_hr_employee" model="ir.ui.menu">
+            <field name="name">Members</field>
+            <field name="action" ref="committee_module.hr_employee_public_action_inherited"/>
         </record>
 
     </data>

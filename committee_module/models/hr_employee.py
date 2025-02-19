@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
 import logging
 
@@ -32,93 +32,98 @@ class HrEmployee(models.Model):
 
         for employee in self:
             if not employee.active:
-                print(f"Archiving employee: {employee.name} (ID: {employee.id})")
+                _logger.info("Archiving employee: %s (ID: %s)", employee.name, employee.id)
 
-                # Get the associated user
-                user = self.env['res.users'].search([('id', '=', employee.user_id.id)])
-
-                # Check if the user is active and archive the user first
+                # Archive associated user
+                user = employee.user_id
                 if user and user.active:
-                    print(f"Archiving associated user: {user.login}")
-                    user.write({'active': False})  # Deactivate the user
+                    _logger.info("Archiving associated user: %s", user.login)
+                    user.write({'active': False})
 
-                # Archive partners where employee_ids contain this employee, and only consider active partners
-                partners = self.env['res.partner'].search([
-                    ('employee_ids', '=', employee.id),
-                    ('active', '=', True)  # Only consider active partners for archiving
-                ])
-                if partners:
-                    print(
-                        f"Found active partners related to employee {employee.name}: {[partner.name for partner in partners]}")
-                    partners.write({'active': False})  # Deactivate partners
-                    print(f"Archived {len(partners)} partner(s) related to employee {employee.name}")
+                # Archive partner(s) using email if available
+                if employee.work_email:
+                    partners = self.env['res.partner'].search([
+                        ('email', '=', employee.work_email),
+                        ('active', '=', True)
+                    ])
                 else:
-                    print(f"No active partners found related to employee {employee.name}")
+                    partners = self.env['res.partner'].search([
+                        ('employee_ids', 'in', [employee.id]),
+                        ('active', '=', True)
+                    ])
+                if partners:
+                    _logger.info("Found active partner(s) related to employee %s: %s",
+                                 employee.name, partners.mapped('name'))
+                    partners.write({'active': False})
+                    _logger.info("Archived %s partner(s) related to employee %s",
+                                 len(partners), employee.name)
+                else:
+                    _logger.info("No active partners found related to employee %s", employee.name)
 
             else:
-                print(f"Activating employee: {employee.name} (ID: {employee.id})")
+                _logger.info("Activating employee: %s (ID: %s)", employee.name, employee.id)
 
-                # Unarchive partners where employee_ids contain this employee, and only consider archived partners
-                partners = self.env['res.partner'].search([
-                    ('employee_ids', '=', employee.id),
-                    ('active', '=', False)  # Only consider archived partners for unarchiving
-                ])
+                # Reactivate partner(s) using email if available
+                if employee.work_email:
+                    partners = self.env['res.partner'].search([
+                        ('email', '=', employee.work_email),
+                        ('active', '=', False)
+                    ])
+                else:
+                    partners = self.env['res.partner'].search([
+                        ('employee_ids', 'in', [employee.id]),
+                        ('active', '=', False)
+                    ])
                 if partners:
-                    print(
-                        f"Found archived partners related to employee {employee.name}: {[partner.name for partner in partners]}")
-                    partners.write({'active': True})  # Reactivate partners
-                    print(f"Unarchived {len(partners)} partner(s) related to employee {employee.name}")
+                    _logger.info("Found archived partner(s) related to employee %s: %s",
+                                 employee.name, partners.mapped('name'))
+                    partners.write({'active': True})
+                    _logger.info("Unarchived %s partner(s) related to employee %s",
+                                 len(partners), employee.name)
                 else:
-                    print(f"No archived partners found related to employee {employee.name} for unarchiving.")
+                    _logger.info("No archived partners found for employee %s", employee.name)
 
-                # Unarchive the user linked to this employee
-                user = self.env['res.users'].search(
-                    [('id', '=', employee.user_id.id), ('active', '=', False)])  # Search for archived user
-                if user:
-                    print(f"Found archived user related to employee {employee.name}: {user.login}")
-                    user.write({'active': True})  # Reactivate the user
-                    print(f"Unarchived user related to employee {employee.name}: {user.login}")
-                else:
-                    print(f"No archived user found related to employee {employee.name} for unarchiving.")
-
-                # Debugging: Check the state of employee_ids
-                employee_partners = self.env['res.partner'].search([
-                    ('employee_ids', '=', employee.id),
-                    ('active', '=', False)  # Check currently linked archived partners
+                # Reactivate associated user
+                user = self.env['res.users'].search([
+                    ('id', '=', employee.user_id.id),
+                    ('active', '=', False)
                 ])
-                if employee_partners:
-                    print(
-                        f"Currently linked archived partners to employee {employee.name}: {[partner.name for partner in employee_partners]}")
+                if user:
+                    _logger.info("Found archived user related to employee %s: %s", employee.name, user.login)
+                    user.write({'active': True})
+                    _logger.info("Unarchived user related to employee %s: %s", employee.name, user.login)
                 else:
-                    print(f"No archived partners currently linked to employee {employee.name} in employee_ids.")
-
+                    _logger.info("No archived user found for employee %s", employee.name)
 
     def unlink(self):
         for employee in self:
-            if employee.active:
-                print(f"Archiving employee: {employee.name} (ID: {employee.id})")
+            _logger.info("Processing unlink for employee: %s (ID: %s)", employee.name, employee.id)
 
-                # Get the associated user
-                user = self.env['res.users'].search([('id', '=', employee.user_id.id)])
+            # Archive (deactivate) the associated user if active.
+            user = employee.user_id
+            if user and user.active:
+                _logger.info("Archiving associated user: %s", user.login)
+                user.write({'active': False})
 
-                # Check if the user is active and archive the user first
-                if user and user.active:
-                    print(f"Archiving associated user: {user.login}")
-                    user.write({'active': False})  # Deactivate the user
-
-                # Archive partners where employee_ids contain this employee, and only consider active partners
+            # Locate partner records associated with the employee.
+            # Note: Using the 'in' operator ensures that many2many/one2many fields are searched correctly.
+            if employee.work_email:
                 partners = self.env['res.partner'].search([
-                    ('employee_ids', '=', employee.id),
-                    ('active', '=', True)  # Only consider active partners for archiving
+                    ('email', '=', employee.work_email),
+                    ('active', '=', True)
                 ])
-                if partners:
-                    print(f"Found active partners related to employee {employee.name}: {[partner.name for partner in partners]}")
-                    partners.write({'active': False})  # Deactivate partners
-                    print(f"Archived {len(partners)} partner(s) related to employee {employee.name}")
-                else:
-                    print(f"No active partners found related to employee {employee.name}")
+            else:
+                partners = self.env['res.partner'].search([
+                    ('employee_ids', 'in', [employee.id]),
+                    ('active', '=', True)
+                ])
+            if partners:
+                partners.write({'active':False})
+                _logger.info("Deleting partner(s) related to employee %s: %s",
+                             employee.name, partners.mapped('name'))
+            else:
+                _logger.info("No partners found related to employee %s", employee.name)
 
-        # Call the super method to actually unlink the employees after archiving related records
         return super(HrEmployee, self).unlink()
 
     def _inverse_work_contact_details(self):
@@ -186,7 +191,9 @@ class HrEmployee(models.Model):
                         existing_partner.id
                     )
         # Create employees without triggering partner creation
-        employees = super().create(vals_list)
+        employees = super(HrEmployee, self.with_context(mail_create_nolog=True)).create(vals_list)
+        employees.message_post(body=_("Member created"))
+        # employees = super().create(vals_list)
         employees._create_work_contacts()
         return employees
 
@@ -311,25 +318,3 @@ class HrEmployeePublic(models.Model):
     def _onchange_committee(self):
         if self.committees_ids:
             self.department_id = self.committees_ids[0].id
-
-
-class HrContract(models.Model):
-    _inherit = 'hr.contract'
-
-    default_contract_id = fields.Many2one(string='Tenure Template')
-    sign_template_id = fields.Many2one(string='New Tenure Document Template')
-    contract_update_template_id = fields.Many2one(string='Tenure Update Document Template')
-    hr_responsible_id = fields.Many2one(string='Responsible')
-
-
-class HrTimesheet(models.Model):
-    _inherit = 'account.analytic.line'
-
-    employee_id = fields.Many2one(string='Member')
-    project_id = fields.Many2one(string='Action Point')
-
-
-class Onboarding(models.Model):
-    _inherit = 'mail.activity.plan.template'
-
-    employee_role_id = fields.Many2one(string='Member Role')

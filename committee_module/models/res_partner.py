@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError, UserError
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
-    employee_ids = fields.One2many('hr.employee', 'partner_id', string="Employees")
+    employee_ids = fields.One2many('hr.employee', 'partner_id', string="Members")
 
     def write(self, vals):
         # If this update is triggered by an employee update, do not propagate further.

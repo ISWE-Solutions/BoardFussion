@@ -2142,30 +2142,53 @@ class OdooCalendarInheritence(models.Model):
                 _logger.info("Saved document: %s (Type: %s)", attachment.name, doc_type)
             else:
                 _logger.warning("No document saved for type: %s", doc_type)
-        self.is_board_park = True
 
         # If there were any errors, open a wizard to notify the user.
         if all_failed_errors:
-            error_details = "<ul>" + "".join(
-                f"<li>Attachment: {err['name']} (Extension: {err['extension']}) - {err['error_message']}</li>"
-                for err in all_failed_errors
-            ) + "</ul>"
+            error_details = """
+            <table style="width:100%; border: none;">
+              <thead>
+                <tr>
+                  <th style="border:1px solid #ccc; padding:5px; text-align:left;">Attachment</th>
+                </tr>
+              </thead>
+              <tbody>
+            """
+            for err in all_failed_errors:
+                error_details += f"""
+                <tr>
+                  <td style="border:none; padding:5px;">{err['name']}</td>
+                </tr>
+                """
+            error_details += """
+              </tbody>
+            </table>
+            <p style="padding:1rem; border:1px solid black; margin-top:1rem; background-color:light-grey; color:crimson;">
+                Please manually convert to PDF and re-upload the document(s).
+            </p>
+            """
+
             wizard = self.env['merge.error.wizard'].create({
                 'error_message': error_details,
-                # Optionally pass next action context if needed.
             })
 
             return {
-                'name': _('Merge Errors'),
+                'name': _('The following files failed to convert to PDF and are not part of the Boardpack'),
                 'view_mode': 'form',
                 'view_id': self.env.ref('odoo_calendar_inheritence.merge_error_wizard_form_view').id,
                 'res_model': 'merge.error.wizard',
                 'res_id': wizard.id,
                 'type': 'ir.actions.act_window',
                 'target': 'new',
+                # Pass the next action and also the original record’s ID and model name
+                'context': {
+                    'next_action': self.action_open_boardpack(),
+                    'active_id': self.id,
+                    'active_model': self._name,
+                },
             }
 
-        # No errors: continue with the process flow.
+        self.is_board_park = True
         action = self.action_open_boardpack()
         return action
 
@@ -2277,9 +2300,29 @@ class MergeErrorWizard(models.TransientModel):
     _name = 'merge.error.wizard'
     _description = 'Merge Error Notification'
 
-    error_message = fields.Text(string="Merge Errors", readonly=True)
+    error_message = fields.Html(string="_", readonly=True)
 
     def action_continue(self):
-        """Called when the user clicks the Continue button."""
-        # Return the next action. For example, if you need to open the boardpack:
-        return self.env.context.get('next_action') or {'type': 'ir.actions.act_window_close'}
+        """Called when the user clicks the Continue button.
+           This method updates the original record (setting is_board_park to True)
+           and then proceeds with the next action.
+        """
+        # Retrieve the original record’s ID and model from the context
+        active_id = self.env.context.get('active_id')
+        active_model = self.env.context.get('active_model')
+        if active_id and active_model:
+            record = self.env[active_model].browse(active_id)
+            record.write({'is_board_park': True})
+
+        # Get the next action from the context and return it
+        next_action = self.env.context.get('next_action')
+        if next_action:
+            return next_action
+        return {'type': 'ir.actions.act_window_close'}
+
+    def action_cancel(self):
+        """Called when the user clicks the Cancel button.
+           The boardpack saving process is aborted.
+        """
+        # You can add additional cleanup logic here if needed.
+        return {'type': 'ir.actions.act_window_close'}

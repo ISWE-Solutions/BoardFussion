@@ -28,64 +28,102 @@ class User(models.Model):
         return res
 
     def toggle_active(self):
-        super().toggle_active()  # Call the parent method
+        super(User, self).toggle_active()  # Call the parent method to toggle the user status
 
         for user in self:
-            if not user.active:  # User is being archived
+            if not user.active:  # The user is being archived
                 print(f"Archiving user: {user.login} (ID: {user.id})")
 
-                # Check if there is an associated employee record
-                employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
+                # Search and archive related employee records
+                employees = self.env['hr.employee'].search([('user_id', '=', user.id)])
+                if employees:
+                    print(f"Archiving employee(s) for user {user.login}: {[emp.name for emp in employees]}")
+                    employees.write({'active': False})
+                else:
+                    print(f"No employee records found for user {user.login}")
 
-                if not employee:  # Only proceed if no associated employee
-                    # Archive related partners
-                    partners_to_archive = self.env['res.partner'].search([
-                        '|',  # Use OR to search for both conditions
-                        ('employee_ids.user_id', '=', user.id),  # Partners related via employee_ids
-                        ('id', '=', user.partner_id.id),  # Partners linked via partner_id
-                        ('active', '=', True)  # Only consider active partners for archiving
+                # Search and archive related partner records
+                if user.email:
+                    partners = self.env['res.partner'].search([
+                        ('email', '=', user.email),
+                        ('active', '=', True)
                     ])
-
-                    if partners_to_archive:
-                        print(
-                            f"Found active partners related to user {user.login}: {[partner.name for partner in partners_to_archive]}")
-                        partners_to_archive.write({'active': False})  # Deactivate partners
-                        print(f"Archived {len(partners_to_archive)} partner(s) related to user {user.login}")
-                    else:
-                        print(f"No active partners found related to user {user.login}.")
                 else:
-                    print(f"User {user.login} has an associated employee. Skipping partner archiving.")
-
-    def unlink(self):
-        for user in self:
-            # Check if there is an associated employee record
-            employee = self.env['hr.employee'].search([('user_id', '=', user.id)], limit=1)
-
-            if employee:  # User has an associated employee
-                print(f"User {user.login} has an associated employee. Archiving user only.")
-                user.active = False  # Archive the user
-
-            else:  # No associated employee
-                print(f"User {user.login} has no associated employee. Deleting user and archiving partners.")
-
-                # Archive the user first
-                user.active = False  # Archive the user
-
-                # Archive related partners
-                partners_to_archive = self.env['res.partner'].search([
-                    '|',  # Use OR to search for both conditions
-                    ('employee_ids.user_id', '=', user.id),  # Partners related via employee_ids
-                    ('id', '=', user.partner_id.id),  # Partners linked via partner_id
-                    ('active', '=', True)  # Only consider active partners for archiving
-                ])
-
-                if partners_to_archive:
-                    partners_to_archive.write({'active': False})  # Deactivate partners
-                    print(f"Archived {len(partners_to_archive)} partner(s) related to user {user.login}")
+                    partners = self.env['res.partner'].search([
+                        '|',
+                        ('employee_ids.user_id', 'in', [user.id]),
+                        ('id', '=', user.partner_id.id),
+                        ('active', '=', True)
+                    ])
+                if partners:
+                    print(f"Archiving partner(s) for user {user.login}: {[partner.name for partner in partners]}")
+                    partners.write({'active': False})
                 else:
-                    print(f"No active partners found related to user {user.login}.")
+                    print(f"No partner records found for user {user.login}")
 
-        # Note: Do not call super().unlink() since we are archiving instead of deleting
+            else:  # The user is being reactivated
+                print(f"Activating user: {user.login} (ID: {user.id})")
+
+                # Use with_context(active_test=False) to retrieve archived employee records
+                employees = self.env['hr.employee'].with_context(active_test=False).search([('user_id', '=', user.id)])
+                if employees:
+                    print(f"Activating employee(s) for user {user.login}: {[emp.name for emp in employees]}")
+                    employees.write({'active': True})
+                else:
+                    print(f"No employee records found for user {user.login}")
+
+                # Search and activate related partner records
+                if user.email:
+                    partners = self.env['res.partner'].search([
+                        ('email', '=', user.email),
+                        ('active', '=', False)
+                    ])
+                else:
+                    partners = self.env['res.partner'].search([
+                        '|',
+                        ('employee_ids.user_id', 'in', [user.id]),
+                        ('id', '=', user.partner_id.id),
+                        ('active', '=', False)
+                    ])
+                if partners:
+                    print(f"Activating partner(s) for user {user.login}: {[partner.name for partner in partners]}")
+                    partners.write({'active': True})
+                else:
+                    print(f"No partner records found for user {user.login}")
+
+    # def unlink(self):
+    #     for user in self:
+    #         # Delete associated employee records (include archived ones)
+    #         employees = self.env['hr.employee'].with_context(active_test=False).search([
+    #             ('user_id', '=', user.id)
+    #         ])
+    #         if employees:
+    #             print(f"Deleting employee(s) for user {user.login}: {[emp.name for emp in employees]}")
+    #             employees.unlink()
+    #         else:
+    #             print(f"No employee records found for user {user.login}")
+    #
+    #         # Delete associated partner records
+    #         # Use the email as a first search criterion if it exists,
+    #         # otherwise use a fallback domain based on employee_ids or partner_id.
+    #         if user.email:
+    #             partners = self.env['res.partner'].search([
+    #                 ('email', '=', user.email)
+    #             ])
+    #         else:
+    #             partners = self.env['res.partner'].search([
+    #                 '|',
+    #                 ('employee_ids.user_id', 'in', [user.id]),
+    #                 ('id', '=', user.partner_id.id)
+    #             ])
+    #         if partners:
+    #             print(f"Deleting partner(s) for user {user.login}: {[partner.name for partner in partners]}")
+    #             partners.unlink()
+    #         else:
+    #             print(f"No partner records found for user {user.login}")
+    #
+    #     # Finally, delete the user record(s)
+    #     return super(User, self).unlink()
 
     @api.model_create_multi
     def create(self, vals_list):

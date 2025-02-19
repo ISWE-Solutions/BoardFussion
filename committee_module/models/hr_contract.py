@@ -4,6 +4,10 @@ class HrContract(models.Model):
     _inherit = 'hr.contract'
 
     resource_calendar_id = fields.Many2one('resource.calendar', readonly=False)
+    default_contract_id = fields.Many2one(string='Tenure Template')
+    sign_template_id = fields.Many2one(string='New Tenure Document Template')
+    contract_update_template_id = fields.Many2one(string='Tenure Update Document Template')
+    hr_responsible_id = fields.Many2one(string='Responsible')
 
     @api.model_create_multi
     def create(self, vals_list):
