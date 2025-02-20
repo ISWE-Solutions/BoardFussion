@@ -2154,13 +2154,27 @@ class OdooCalendarInheritence(models.Model):
               </thead>
               <tbody>
             """
+            unique_names = set()
+            error_details_rows = ""
             for err in all_failed_errors:
-                error_details += f"""
+                name = err['name']
+                if name not in unique_names:
+                    error_details_rows += f"""
+                    <tr>
+                      <td style="border:none; padding:5px;">{name}</td>
+                    </tr>
+                    """
+                    unique_names.add(name)
+
+            error_details = f"""
+            <table style="width:100%; border: none;">
+              <thead>
                 <tr>
-                  <td style="border:none; padding:5px;">{err['name']}</td>
+                  <th style="border:1px solid #ccc; padding:5px; text-align:left;">Attachment</th>
                 </tr>
-                """
-            error_details += """
+              </thead>
+              <tbody>
+                {error_details_rows}
               </tbody>
             </table>
             <p style="padding:1rem; border:1px solid black; margin-top:1rem; background-color:light-grey; color:crimson;">
