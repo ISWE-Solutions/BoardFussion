@@ -275,8 +275,8 @@
                     <field name="has_attendees_confirmed" invisible="1"/>
                     <field name="is_confidential_minutes_uploaded" invisible="1"/>
                     <field name="is_non_confidential_minutes_uploaded" invisible="1"/>
-                    <field name="is_minutes_published" invisible="0"/>
-                    <field name="is_description_created" invisible="0"/>
+                    <field name="is_minutes_published" invisible="1"/>
+                    <field name="is_description_created" invisible="1"/>
                     <field name="is_minutes_created" invisible="1"/>
                     <field name="is_minutes_uploaded" invisible="1"/>
                     <field name="action_visibility" widget="radio" options="{'horizontal': true}" class="mt-2"
@@ -366,72 +366,88 @@
         </field>
     </record>
 
+    <record id="view_calendar_event_form_inherit_readonly_minutes" model="ir.ui.view">
+        <field name="name">calendar.event.form.inherit.readonly.minutes</field>
+        <field name="model">calendar.event</field>
+        <field name="inherit_id" ref="calendar.view_calendar_event_form"/>
+        <field name="arch" type="xml">
+            <!-- Make the "name" field readonly if is_minutes_published is True -->
+            <xpath expr="//div[contains(@class, 'oe_title')]/h1/field[@name='name']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <!-- Make the date fields readonly if is_minutes_published is True -->
+            <xpath expr="//sheet//field[@name='start_date']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='start']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='stop']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <!-- Additional individual fields can also be made readonly -->
+            <xpath expr="//sheet//field[@name='duration']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='allday']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='location']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='from_agenda']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='videocall_location']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='description']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='partner_ids']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='alarm_ids']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='current_status']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='recurrency']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='categ_ids']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='privacy']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//field[@name='user_id']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//div//button[@name='action_join_video_call']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//div//button[@name='set_discuss_videocall_location']" position="attributes">
+                <attribute name="readonly">is_board_park</attribute>
+            </xpath>
+            <xpath expr="//sheet//div//button[@name='clear_videocall_location']" position="attributes">
+                <attribute name="invisible">is_minutes_published</attribute>
+            </xpath>
+        </field>
+    </record>
+
 <!--    <record id="view_calendar_event_form_inherit_readonly_minutes" model="ir.ui.view">-->
 <!--        <field name="name">calendar.event.form.inherit.readonly.minutes</field>-->
 <!--        <field name="model">calendar.event</field>-->
 <!--        <field name="inherit_id" ref="calendar.view_calendar_event_form"/>-->
 <!--        <field name="arch" type="xml">-->
 <!--            &lt;!&ndash; Make the "name" field readonly if is_minutes_published is True &ndash;&gt;-->
-<!--            <xpath expr="//div[contains(@class, 'oe_title')]/h1/field[@name='name']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            &lt;!&ndash; Make the date fields readonly if is_minutes_published is True &ndash;&gt;-->
-<!--            <xpath expr="//sheet//field[@name='start_date']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='start']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='stop']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
 <!--            &lt;!&ndash; Additional individual fields can also be made readonly &ndash;&gt;-->
-<!--            <xpath expr="//sheet//field[@name='duration']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='allday']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='location']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='from_agenda']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='videocall_location']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='description']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
 <!--            <xpath expr="//sheet//field[@name='partner_ids']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
+<!--                <attribute name="readonly">is_board_park</attribute>-->
 <!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='alarm_ids']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='current_status']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='recurrency']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='categ_ids']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='privacy']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--            <xpath expr="//sheet//field[@name='user_id']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--             <xpath expr="//sheet//div//button[@name='action_join_video_call']" position="attributes">-->
-<!--                <attribute name="invisible">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--             <xpath expr="//sheet//div//button[@name='set_discuss_videocall_location']" position="attributes">-->
-<!--                <attribute name="readonly">[('is_minutes_published', '=', True)]</attribute>-->
-<!--            </xpath>-->
-<!--             <xpath expr="//sheet//div//button[@name='clear_videocall_location']" position="attributes">-->
+<!--            <xpath expr="//sheet//div//button[@name='clear_videocall_location']" position="attributes">-->
 <!--                <attribute name="invisible">[('is_minutes_published', '=', True)]</attribute>-->
 <!--            </xpath>-->
 <!--        </field>-->

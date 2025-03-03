@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-<!--        <record id="custom_survey_user_input_view_tree" model="ir.ui.view">-->
-<!--            <field name="name">Custom Survey User Input Tree View</field>-->
-<!--            <field name="model">survey.user_input</field>-->
-<!--            <field name="inherit_id" ref="hr_appraisal_survey.hr_appraisal_survey_user_input_view_tree"/>-->
-<!--            <field name="arch" type="xml">-->
-<!--                &lt;!&ndash; Modify the existing button attributes &ndash;&gt;-->
-<!--                <xpath expr="//button[@name='action_ask_feedback']" position="attributes">-->
-<!--                    <attribute name="string">Submit Evaluation</attribute>-->
-<!--                </xpath>-->
-<!--                <xpath expr="//button[@name='action_ask_feedback']" position="after">-->
-<!--                    <button string="View Evaluation" name="action_survey" icon="fa-eye" type="object"-->
-<!--                            class="oe_highlight"/>-->
-<!--                </xpath>-->
-<!--            </field>-->
-<!--        </record>-->
+        <!--        <record id="custom_survey_user_input_view_tree" model="ir.ui.view">-->
+        <!--            <field name="name">Custom Survey User Input Tree View</field>-->
+        <!--            <field name="model">survey.user_input</field>-->
+        <!--            <field name="inherit_id" ref="hr_appraisal_survey.hr_appraisal_survey_user_input_view_tree"/>-->
+        <!--            <field name="arch" type="xml">-->
+        <!--                &lt;!&ndash; Modify the existing button attributes &ndash;&gt;-->
+        <!--                <xpath expr="//button[@name='action_ask_feedback']" position="attributes">-->
+        <!--                    <attribute name="string">Submit Evaluation</attribute>-->
+        <!--                </xpath>-->
+        <!--                <xpath expr="//button[@name='action_ask_feedback']" position="after">-->
+        <!--                    <button string="View Evaluation" name="action_survey" icon="fa-eye" type="object"-->
+        <!--                            class="oe_highlight"/>-->
+        <!--                </xpath>-->
+        <!--            </field>-->
+        <!--        </record>-->
 
         <record id="survey_user_input_view_tree_inherit_appraisal_custom" model="ir.ui.view">
             <field name="name">survey.user.input.view.tree.inherit.appraisal.custom</field>
@@ -26,6 +26,10 @@
                     <attribute name="string">Member</attribute>
                 </field>
             </field>
+        </record>
+
+        <record id="survey.menu_surveys" model="ir.ui.menu">
+            <field name="name">Resolution &amp; Voting</field>
         </record>
     </data>
 </odoo>

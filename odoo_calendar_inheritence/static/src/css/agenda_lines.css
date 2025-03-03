@@ -37,3 +37,7 @@
 .o_knowledge_sidebar {
         display: none !important;
     }
+
+.o_cw_popover_delete {
+    margin: none;
+}

@@ -9,4 +9,5 @@
             <script type="text/javascript" src="/odoo_calendar_inheritence/static/src/js/custom_confirm.js"></script>
         </xpath>
     </template>
+
 </odoo>

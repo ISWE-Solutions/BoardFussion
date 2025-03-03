@@ -2,16 +2,9 @@ from email.policy import default
 
 from PyPDF2 import PdfReader, PdfWriter
 import re
-from markupsafe import Markup
 from bs4 import BeautifulSoup
-from io import BytesIO
-import base64
 import zipfile
-import base64
-import logging
-import io
 import os
-from io import BytesIO
 from markupsafe import Markup, escape
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 from reportlab.lib.randomtext import subjects
@@ -20,26 +13,25 @@ from odoo import models, fields, api, Command, _
 from odoo.exceptions import ValidationError, UserError
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, ListFlowable, ListItem
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib.units import inch
-from io import StringIO, BytesIO
 from xml.sax.saxutils import escape
 from weasyprint import HTML
 from datetime import datetime
-import pandas as pd
-from reportlab.lib import colors
-from io import BytesIO
-import csv
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
 from docx import Document
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import subprocess
 import tempfile
+import csv
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from io import StringIO
+import pandas as pd
+from PIL import Image
+from PyPDF2 import PdfWriter, PdfReader
+from io import BytesIO
+import base64
+import logging
 
 _logger = logging.getLogger(__name__)
 
@@ -178,6 +170,7 @@ class OdooCalendarInheritence(models.Model):
     is_non_confidential_minutes_uploaded = fields.Boolean(default=False)
 
     user_is_board_secretary = fields.Boolean(compute='_compute_user_is_board_secretary')
+    partner_readonly = fields.Boolean(compute="_compute_partner_readonly", store=True)
 
     @api.depends_context('uid')
     def _compute_user_is_board_secretary(self):
@@ -199,6 +192,16 @@ class OdooCalendarInheritence(models.Model):
                     node.set('create', 'true')
             res['arch'] = etree.tostring(doc, encoding='unicode')
         return res
+
+    @api.depends('is_minutes_published')
+    def _compute_partner_readonly(self):
+        for record in self:
+            record.partner_readonly = record.is_minutes_published
+
+    @api.onchange('is_minutes_published')
+    def _onchange_is_minutes_published(self):
+        if not self.is_minutes_published:
+            self.partner_id = False
 
     @api.depends('product_line_ids.confidential')
     def _compute_has_confidential_agenda_item(self):
@@ -1604,11 +1607,6 @@ class OdooCalendarInheritence(models.Model):
         Merge the cover file (from disk) with provided attachments, converting non-PDF files to PDF.
         Returns a tuple: (merged_stream, failed_attachments)
         """
-        from PyPDF2 import PdfWriter, PdfReader
-        from io import BytesIO
-        import base64
-        import logging
-
         _logger = logging.getLogger(__name__)
         self.ensure_one()
         merged_stream = BytesIO()
@@ -1691,20 +1689,12 @@ class OdooCalendarInheritence(models.Model):
             raise UserError(_("Unsupported file type: %s") % file_name)
 
     def _convert_image_to_pdf(self, image_data):
-        from PIL import Image
-        from io import BytesIO
         img = Image.open(BytesIO(image_data))
         pdf_buffer = BytesIO()
         img.save(pdf_buffer, format='PDF')
         return pdf_buffer.getvalue()
 
     def _convert_csv_to_pdf(self, csv_data):
-        import csv
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter, landscape
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-        from io import StringIO
-
         csv_content = csv_data.decode('utf-8')  # Decode bytes to string
         reader = csv.reader(StringIO(csv_content))
         data = list(reader)
@@ -1754,8 +1744,6 @@ class OdooCalendarInheritence(models.Model):
         return pdf_buffer.getvalue()
 
     def _convert_xlsx_to_pdf(self, xlsx_data):
-        import pandas as pd
-        from io import BytesIO
         # Read the Excel file into a DataFrame
         df = pd.read_excel(BytesIO(xlsx_data), engine='openpyxl')
         # Convert DataFrame to list-of-lists with header as first row

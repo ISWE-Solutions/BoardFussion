@@ -54,6 +54,18 @@
         </field>
     </record>
 
+    <record id="res_users_view_simplified_updated" model="ir.ui.view">
+        <field name="name">res_users_view_simplified_updated_2</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_simple_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='groups_id']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+
     <record id="res_users_inherit_form_view_appraisal_extended" model="ir.ui.view">
         <field name="name">res.users.inherit.form.view.appraisal.extended</field>
         <field name="model">res.users</field>
