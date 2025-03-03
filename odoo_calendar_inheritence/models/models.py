@@ -942,6 +942,11 @@ class OdooCalendarInheritence(models.Model):
                     'view_mode': 'form',
                     'res_id': record.article_id.id,
                     'target': 'current',
+                    'context': {
+                        # Add these to preserve breadcrumbs
+                        'active_id': self.id,
+                        'active_model': self._name,
+                    },
                 }
 
     def action_non_confidential_view_knowledge_article(self):
@@ -956,6 +961,11 @@ class OdooCalendarInheritence(models.Model):
                     'view_mode': 'form',
                     'res_id': record.non_confidential_article_id.id,
                     'target': 'current',
+                    'context': {
+                        # Add these to preserve breadcrumbs
+                        'active_id': self.id,
+                        'active_model': self._name,
+                    },
                 }
 
     def action_view_description_article(self):
